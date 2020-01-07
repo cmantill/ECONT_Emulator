@@ -7,7 +7,8 @@ import time
 import matplotlib.pyplot as plt
 
 from encode import encode, decode
-from bestchoice import batcher_sort
+from bestchoice import batcher_sort,sort,sorter
+from format import formatThresholdOutput 
 encodeList = np.vectorize(encode)
 
 
@@ -184,7 +185,7 @@ def getThresAlgoBlock(calQ_csv,thres_csv,calib_csv):
     df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 32-48 TC regardless of threshold
 
     def makeCHARGEQ(row):
-        charges = np.array(row.dropna())
+        charges = np.array(row.dropna()).astype(int)
         return np.pad(charges,(0,48-len(charges)),mode='constant',constant_values=0)
 
     ## boolean list of 48 TC cells (filled 0 in df_passThres first)
@@ -197,7 +198,7 @@ def getThresAlgoBlock(calQ_csv,thres_csv,calib_csv):
     return df_out
 
 
-def writeInputCSV(df,geomDF,subdet,layer,wafer):
+def writeInputCSV(odir,df,geomDF,subdet,layer,wafer):
     #output of switch matrix ( i.e. decoded charge)
     SM_headers = ["SM_%s"%i for i in range(0,48)]
     #output of Calibration ( i.e. calib charge)
@@ -212,8 +213,8 @@ def writeInputCSV(df,geomDF,subdet,layer,wafer):
     df_out[SM_headers]     = pd.DataFrame((smlist).values.tolist(),index=smlist.index)
     df_out[CALQ_headers]   = pd.DataFrame((calQlist).values.tolist(),index=calQlist.index)
     df_out.fillna(0,inplace=True)
-    df_out.to_csv("SM_output.csv"  ,columns=SM_headers,index=False)
-    df_out.to_csv("CALQ_output.csv",columns=CALQ_headers,index=False)
+    df_out.to_csv("%s/SM_output.csv"%odir  ,columns=SM_headers,index=False)
+    df_out.to_csv("%s/CALQ_output.csv"%odir,columns=CALQ_headers,index=False)
 
     ## write subsidary files
     df_geom = geomDF.reset_index()
@@ -221,12 +222,37 @@ def writeInputCSV(df,geomDF,subdet,layer,wafer):
     df_geom = df_geom.reset_index(drop=True)
     precision  = 2**-11
     df_geom['corrFactor_finite']    = round(1./np.cosh(df_geom.eta) / precision) * precision
-    df_geom[['corrFactor_finite']].transpose().to_csv("calib_D%sL%sW%s.csv"%(subdet,layer,wafer),index=False)
-    df_geom[['threshold_ADC']].transpose().to_csv("thres_D%sL%sW%s.csv"%(subdet,layer,wafer),index=False)
+    df_geom[['corrFactor_finite']].transpose().to_csv("%s/calib_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False)
+    df_geom[['threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False)
 
     return
 
-def main(args):
+def writeThresholdFormat(d_csv):
+    df_wafer  = pd.read_csv(d_csv['wafer_csv'])
+    df_addmap = pd.read_csv(d_csv['add_csv'])
+    df_charge = pd.read_csv(d_csv['charge_csv'])
+    
+    df_wafer['CHARGEQ'] = df_charge.apply(list,axis=1)
+    df_wafer['ADD_MAP'] = df_addmap.apply(list,axis=1)
+    
+    df_wafer ['FRAMEQ'] = df_wafer.apply(formatThresholdOutput,axis=1)
+    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ'],index=False)
+    return
+
+def writeBestChoice(d_csv):
+    df_in = pd.read_csv(d_csv['calQ_csv'])
+    df_sorted, _ = sort(df_in)
+    df_sorted_index = pd.DataFrame(df_in.apply(batcher_sort, axis=1))
+    df_sorted.columns = ['BC_Charge_{}'.format(i) for i in range(0, df_sorted.shape[1])]
+    df_sorted.index.name = 'BC'
+    df_sorted_index.columns = ['BC_Address_{}'.format(i) for i in range(0, df_sorted_index.shape[1])]
+    df_sorted_index.index.name = 'BC'
+    df_sorted.to_csv(d_csv['bc_charge_csv'],index=False)
+    df_sorted_index.to_csv(d_csv['bc_address_csv'],index=False)
+    return
+    
+
+def main(opt,args):
 
     fName='ntuple_bc.root'
 
@@ -238,27 +264,37 @@ def main(args):
     layer  = 5
     wafer  = 31
 
+    odir = opt.odir
     geomDF          =   getGeomDF()
     customCharge_df =   processTree(_tree,geomDF,subdet,layer,wafer)
-    writeInputCSV( customCharge_df, geomDF, subdet,layer,wafer)
+    writeInputCSV( odir,  customCharge_df, geomDF, subdet,layer,wafer)
     #df_algo         =   getAlgoBlockOutputDF(customCharge_df)
     df_algo         =   getThresAlgoBlock('CALQ_output.csv','thres_D3L5W31.csv','calib_D3L5W31.csv')
-    #ADD = ["ADDMAP_%s"%i for i in range(0,48)]
-    #CHARGEQ = ["CHARGEQ_%s"%i for i in range(0,48)]
-    #cols = np.array(df_algo.columns.tolist())
-    #OTHERS = np.logical_and(~np.in1d(cols,ADD),~np.in1d(cols,CHARGEQ))
-    #df_algo.to_csv('xcheck_charge.csv',columns=CHARGEQ,index=False)
-    #df_algo.to_csv('xcheck_ADD.csv',columns=ADD,index=False)
-    #df_algo.to_csv('xcheck_others.csv',columns=OTHERS,index=False)
-    #df_algo.to_csv('Algo_AddMap.csv',columns=ADD,index=False)
-    #df_algo.to_csv('Algo_ChargeQ.csv',columns=CHARGEQ,index=False)
-    #df_algo.to_csv('Algo_OTHERS.csv',columns=OTHERS,index=False)
+    bc_inputcsv ={
+        'cal_csv'   :'CALQ_output.csv', #input
+        'bc_charge' :'bc_charge.csv',   #output
+        'bc_address':'bc_address.csv',  #output
+    }
+    writeBestChoice(bc_inputcsv)
+    format_inputcsv ={
+        'wafer_csv' :'xcheck_others.csv',   #input
+        'add_csv'   :'xcheck_ADD.csv',      #input
+        'charge_csv':'xcheck_charge.csv',   #input
+        'format_csv':'formatblock.csv'      #output
+    }
+    writeThresholdFormat(format_inputcsv)
+    
+    ADD = ["ADDMAP_%s"%i for i in range(0,48)]
+    CHARGEQ = ["CHARGEQ_%s"%i for i in range(0,48)]
+    cols = np.array(df_algo.columns.tolist())
+    WAFER = np.logical_and(~np.in1d(cols,ADD),~np.in1d(cols,CHARGEQ))
+    df_algo.to_csv('%s/xcheck_charge.csv'%odir,columns=CHARGEQ,index=False)
+    df_algo.to_csv('%s/xcheck_ADD.csv'   %odir,columns=ADD,index=False)
+    #df_algo.to_csv('%s/xcheck_WAFER.csv'%odir,columns=WAFER,index=False)
 
 if __name__=='__main__':
     parser = optparse.OptionParser()
-    parser.add_option("--input", type="string", dest="input_file", help="input pattern file")
-    parser.add_option("--output_charge", type="string", dest="output_charge_file", help="output charges file")
-    parser.add_option("--output_address", type="string", dest="output_address_file", help="output address file")
+    parser.add_option('-o',"--odir", type="string", default = './',dest="odir", help="output directory")
     (opt, args) = parser.parse_args()
 
-    main(args)
+    main(opt,args)

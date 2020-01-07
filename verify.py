@@ -148,7 +148,7 @@ def makeTCindexCols(group,col,iMOD=-1):
     qlist  = np.array(list(group[col]))            #cols for each tc
     charges[tclist] = qlist                       #assign charges in positions
     if iMOD==-1:
-        return list(charges)
+        return list(charges.round().astype(np.int))
     modsum = 0
     if iMOD==0:   modsum = charges[0:16].sum().round().astype(np.int)
     elif iMOD==1: modsum = charges[16:32].sum().round().astype(np.int)
@@ -187,7 +187,7 @@ def getAlgoBlockOutputDF(df):
     return df_out
 
 ### the Threshold algo block from CSV inputs
-def getAlgoBlock(calQ_csv,thres_csv,calib_csv):
+def getThresAlgoBlock(calQ_csv,thres_csv,calib_csv):
 
     df = pd.read_csv(calQ_csv)
     df_thres = pd.read_csv(thres_csv)       ## CSV with 1 entry: decodedCharge thresholds of 48 triggercells
@@ -199,17 +199,17 @@ def getAlgoBlock(calQ_csv,thres_csv,calib_csv):
     calib_thres  = np.array(df_thres.loc[0].tolist()) * np.array(df_calib.loc[0].tolist())
     #Filter all 48 columns
     for i in range(0,48):
-        df_passThres['CALQ_%i'%i] = df[df['CALQ_%i'%i]> calib_thres[i] ]
+        df_passThres['CALQ_%i'%i] = df[df['CALQ_%i'%i]> calib_thres[i] ]['CALQ_%i'%i]
 
     df_out       = pd.DataFrame(index = df.index)
     ADD_headers     = ["ADDMAP_%s"%i for i in range(0,48)]
     CHARGEQ_headers = ["CHARGEQ_%s"%i for i in range(0,48)]
 
     df_out['NTCQ'] = df_passThres.count(axis=1)         #df_passThres has NAN for TC below threshold
-    df_out['SUM']  = df.sum(axis=1)                     #Sum over all charges regardless of threshold
-    df_out['MOD_SUM_0']  = df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1)      #Sum over all charges of 0-16 TC regardless of threshold
-    df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1)      #Sum over all charges of 16-32 TC regardless of threshold
-    df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1)      #Sum over all charges of 32-48 TC regardless of threshold
+    df_out['SUM']  = df.sum(axis=1).round().astype(np.int)                     #Sum over all charges regardless of threshold
+    df_out['MOD_SUM_0']  = df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1).round().astype(np.int)      #Sum over all charges of 0-16 TC regardless of threshold
+    df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 16-32 TC regardless of threshold
+    df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 32-48 TC regardless of threshold
 
 
     def makeCHARGEQ(row):
@@ -226,7 +226,7 @@ def getAlgoBlock(calQ_csv,thres_csv,calib_csv):
     return df_out
 
 
-def writeInputCSV(df):
+def writeInputCSV(df,geomDF,subdet,layer,wafer):
     #output of switch matrix ( i.e. decoded charge)
     SM_headers = ["SM_%s"%i for i in range(0,48)]
     #output of Calibration ( i.e. calib charge)
@@ -243,6 +243,16 @@ def writeInputCSV(df):
     df_out.fillna(0,inplace=True)
     df_out.to_csv("SM_output.csv"  ,columns=SM_headers,index=False)
     df_out.to_csv("CALQ_output.csv",columns=CALQ_headers,index=False)
+
+    ## write subsidary files
+    df_geom = geomDF.reset_index()
+    df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & ( df_geom.wafer==wafer) & (df_geom.zside==1) ]
+    df_geom = df_geom.reset_index(drop=True)
+    precision  = 2**-11
+    df_geom['corrFactor_finite']    = round(1./np.cosh(df_geom.eta) / precision) * precision
+    df_geom[['corrFactor_finite']].transpose().to_csv("calib_D%sL%sW%s.csv"%(subdet,layer,wafer),index=False)
+    df_geom[['threshold_ADC']].transpose().to_csv("thres_D%sL%sW%s.csv"%(subdet,layer,wafer),index=False)
+
     return
 
 def main(args):
@@ -259,14 +269,16 @@ def main(args):
 
     geomDF          =   getGeomDF()
     customCharge_df =   processTree(_tree,geomDF,subdet,layer,wafer)
-    #writeInputCSV( customCharge_df)
+    writeInputCSV( customCharge_df, geomDF, subdet,layer,wafer)
     #df_algo         =   getAlgoBlockOutputDF(customCharge_df)
-    df_algo         =   getAlgoBlock('CALQ_output.csv','thres_D3L5W31.csv','calib_D3L5W31.csv')
-    df_algo.to_csv('xcheck.csv',index=False)
+    df_algo         =   getThresAlgoBlock('CALQ_output.csv','thres_D3L5W31.csv','calib_D3L5W31.csv')
     #ADD = ["ADDMAP_%s"%i for i in range(0,48)]
     #CHARGEQ = ["CHARGEQ_%s"%i for i in range(0,48)]
     #cols = np.array(df_algo.columns.tolist())
     #OTHERS = np.logical_and(~np.in1d(cols,ADD),~np.in1d(cols,CHARGEQ))
+    #df_algo.to_csv('xcheck_charge.csv',columns=CHARGEQ,index=False)
+    #df_algo.to_csv('xcheck_ADD.csv',columns=ADD,index=False)
+    #df_algo.to_csv('xcheck_others.csv',columns=OTHERS,index=False)
     #df_algo.to_csv('Algo_AddMap.csv',columns=ADD,index=False)
     #df_algo.to_csv('Algo_ChargeQ.csv',columns=CHARGEQ,index=False)
     #df_algo.to_csv('Algo_OTHERS.csv',columns=OTHERS,index=False)

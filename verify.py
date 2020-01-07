@@ -155,6 +155,7 @@ def makeTCindexCols(group,col,iMOD=-1):
     elif iMOD==2: modsum = charges[32:48].sum().round().astype(np.int)                                             
     return modsum
 
+### the Threshold algo block from Ntuple directly
 def getAlgoBlockOutputDF(df):
     sumEncoding=(0,5,3) 
     tcEncoding=(0,4,4)
@@ -185,15 +186,18 @@ def getAlgoBlockOutputDF(df):
 
     return df_out
 
+### the Threshold algo block from CSV inputs
 def getAlgoBlock(calQ_csv,thres_csv,calib_csv):
 
     df = pd.read_csv(calQ_csv)
-    df_thres = pd.read_csv(thres_csv)
-    df_calib = pd.read_csv(calib_csv)
+    df_thres = pd.read_csv(thres_csv)       ## CSV with 1 entry: decodedCharge thresholds of 48 triggercells
+    df_calib = pd.read_csv(calib_csv)       ## CSV with 1 entry: calibration factor of 48 triggercells
 
     df_passThres = pd.DataFrame(index = df.index,columns = df.columns)
 
+    #threshold calibCharge = threshold * calibFactor
     calib_thres  = np.array(df_thres.loc[0].tolist()) * np.array(df_calib.loc[0].tolist())
+    #Filter all 48 columns
     for i in range(0,48):
         df_passThres['CALQ_%i'%i] = df[df['CALQ_%i'%i]> calib_thres[i] ]
 
@@ -201,15 +205,20 @@ def getAlgoBlock(calQ_csv,thres_csv,calib_csv):
     ADD_headers     = ["ADDMAP_%s"%i for i in range(0,48)]
     CHARGEQ_headers = ["CHARGEQ_%s"%i for i in range(0,48)]
 
-    df_out['NTCQ'] = df_passThres.count(axis=1)
-    df_out['SUM']  = df.sum(axis=1)
-    df_out['MOD_SUM_0']  = df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1)
-    df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1)
-    df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1)
-    tclist                   = df_passThres.fillna(0).apply(lambda x: np.array(x>0).astype(int),axis=1)
+    df_out['NTCQ'] = df_passThres.count(axis=1)         #df_passThres has NAN for TC below threshold
+    df_out['SUM']  = df.sum(axis=1)                     #Sum over all charges regardless of threshold
+    df_out['MOD_SUM_0']  = df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1)      #Sum over all charges of 0-16 TC regardless of threshold
+    df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1)      #Sum over all charges of 16-32 TC regardless of threshold
+    df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1)      #Sum over all charges of 32-48 TC regardless of threshold
+
+
     def makeCHARGEQ(row):
         charges = np.array(row.dropna())
         return np.pad(charges,(0,48-len(charges)),mode='constant',constant_values=0)
+
+    ## boolean list of 48 TC cells (filled 0 in df_passThres first)
+    tclist                   = df_passThres.fillna(0).apply(lambda x: np.array(x>0).astype(int),axis=1)
+    ## calibCharge list of passing TC cells, padding zeros after list 
     qlist                  = df_passThres.apply(makeCHARGEQ,axis=1)
     df_out[CHARGEQ_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_headers)
     df_out[ADD_headers]     = pd.DataFrame(tclist.values.tolist(),index=tclist.index,columns=ADD_headers)

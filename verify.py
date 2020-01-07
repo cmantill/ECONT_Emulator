@@ -10,34 +10,6 @@ from encode import encode, decode
 from bestchoice import batcher_sort
 encodeList = np.vectorize(encode)
 
-#### Finite precision correction 
-import struct
-def binary(num):
-    return ''.join('{:0>8b}'.format(c) for c in struct.pack('!f', num))
-
-def binaryToFloat(s):
-    ## str of bits -> bytes of hex
-    bytes = int(s, 2).to_bytes(len(s) // 8, byteorder='big')
-    ## IEEE 754 floating point interpretation 
-    return struct.unpack("!f", bytes)[0]
-
-def truncateFloat(float_val, nExp=4,nMant=4):
-    b = binary(float_val)         ## IEEE 754 rep. 
-    signBit = b[0]
-    expBits = b[1:9]
-    mantBits = b[9:32]
-    exp_truc = expBits[:nExp]+'0'*(8-nExp)      ## zero out extra bits 
-    man_truc = mantBits[:nMant]+'0'*(23-nMant)  ## zero out extra bits
-    b_truc   = signBit+exp_truc+man_truc
-    #print ('expbits=     ',expBits, '\nexpbits_truc=',exp_truc)
-    #print ('mantbits      =',mantBits, '\nmantBits_trunc=',mantBits[:nMant]+'0'*(23-nMant))
-    #print(binaryToFloat(b))
-    return (binaryToFloat(b_truc))
-
-truncateFloatList = np.vectorize(truncateFloat)
-
-##########################################
-
 
 def processTree(_tree,geomDF, subdet,layer,wafer):
     #load dataframe
@@ -210,7 +182,6 @@ def getThresAlgoBlock(calQ_csv,thres_csv,calib_csv):
     df_out['MOD_SUM_0']  = df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1).round().astype(np.int)      #Sum over all charges of 0-16 TC regardless of threshold
     df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 16-32 TC regardless of threshold
     df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 32-48 TC regardless of threshold
-
 
     def makeCHARGEQ(row):
         charges = np.array(row.dropna())

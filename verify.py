@@ -46,7 +46,7 @@ def processTree(_tree,geomDF, subdet,layer,wafer):
 
 
     #remove unwanted layers
-    df = df[(df.subdet==subdet) & (df.layer==layer) ]
+    df = df[(df.subdet==subdet) & (df.layer==layer) & ( df.wafer==wafer)  ]
 
     #set index
     df.set_index(['subdet','zside','layer','wafer','triggercell'],append=True,inplace=True)
@@ -72,11 +72,12 @@ def processTree(_tree,geomDF, subdet,layer,wafer):
     ## Conversion factor for transverse charge
     df['corrFactor']    = 1./np.cosh(df.eta)
     ## Conversion factor for transverse charge (with finite precision)
-    df['corrFactor_finite']    = truncateFloatList(1./np.cosh(df.eta),8,4)
+    #df['corrFactor_finite']    = truncateFloatList(1./np.cosh(df.eta),8,4)
+    precision  = 2**-11
+    df['corrFactor_finite']    = round(1./np.cosh(df.eta) / precision) * precision
     #df['threshold_ADC_int'] = geomDF['threshold_ADC_int']
 
     df.reset_index(inplace=True)
-    #df.set_index(['entry','subdet','layer','wafer','triggercell'],inplace=True)
     df.set_index(['entry','subdet','layer','wafer'],inplace=True)
 #     df.set_index(['entry','subdet','zside','layer','wafer','triggercell'],inplace=True)
     
@@ -127,6 +128,8 @@ def getGeomDF():
     fCtoADC = 100./1024.
     geomDF['threshold_fC'] = threshold_mipPt*np.cosh(geomDF.eta) *3.43
     geomDF['threshold_ADC'] = np.round(geomDF.threshold_fC/fCtoADC).astype(np.int)
+    precision = 2**-11
+    geomDF['corrFactor_finite']    = round(1./np.cosh(geomDF.eta) / precision) * precision
     return geomDF
 
 def makeAddMAP(tclist):
@@ -139,11 +142,13 @@ def makeCHARGEQ(qlist):
     charges = np.array(list(qlist))     
     return np.pad(charges,(0,48-len(charges)),mode='constant',constant_values=0)
 
-def modsum(group,iMOD=0):
+def makeTCindexCols(group,col,iMOD=-1):
     charges=np.zeros(48, dtype=float)    #zeros
     tclist = np.array(list(group['triggercell']))  #indexes of tc
-    qlist  = np.array(list(group['calibCharge']))  #charges of tc
+    qlist  = np.array(list(group[col]))            #cols for each tc
     charges[tclist] = qlist                       #assign charges in positions
+    if iMOD==-1:
+        return list(charges)
     modsum = 0
     if iMOD==0:   modsum = charges[0:16].sum().round().astype(np.int)
     elif iMOD==1: modsum = charges[16:32].sum().round().astype(np.int)
@@ -172,13 +177,64 @@ def getAlgoBlockOutputDF(df):
     qlist  = pd.DataFrame(gb_thres['calibCharge'].apply(makeCHARGEQ))
     df_out[ADD_headers]     = pd.DataFrame((tclist)['triggercell'].values.tolist(),index=tclist.index)
     df_out[CHARGEQ_headers] = pd.DataFrame((qlist)['calibCharge'].values.tolist(),index=qlist.index)
-    df_out['MOD_SUM_0']     =pd.DataFrame(gb[['triggercell','calibCharge']].apply(modsum,0))
-    df_out['MOD_SUM_1']     =pd.DataFrame(gb[['triggercell','calibCharge']].apply(modsum,1))    
-    df_out['MOD_SUM_2']     =pd.DataFrame(gb[['triggercell','calibCharge']].apply(modsum,2))   
+    df_out['MOD_SUM_0']     =pd.DataFrame(gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',0))
+    df_out['MOD_SUM_1']     =pd.DataFrame(gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',1))   
+    df_out['MOD_SUM_2']     =pd.DataFrame(gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',2))  
 
     df_out.fillna(0,inplace=True)        ## fill 0 for entries without any TC passing threshold 
 
     return df_out
+
+def getAlgoBlock(calQ_csv,thres_csv,calib_csv):
+
+    df = pd.read_csv(calQ_csv)
+    df_thres = pd.read_csv(thres_csv)
+    df_calib = pd.read_csv(calib_csv)
+
+    df_passThres = pd.DataFrame(index = df.index,columns = df.columns)
+
+    calib_thres  = np.array(df_thres.loc[0].tolist()) * np.array(df_calib.loc[0].tolist())
+    for i in range(0,48):
+        df_passThres['CALQ_%i'%i] = df[df['CALQ_%i'%i]> calib_thres[i] ]
+
+    df_out       = pd.DataFrame(index = df.index)
+    ADD_headers     = ["ADDMAP_%s"%i for i in range(0,48)]
+    CHARGEQ_headers = ["CHARGEQ_%s"%i for i in range(0,48)]
+
+    df_out['NTCQ'] = df_passThres.count(axis=1)
+    df_out['SUM']  = df.sum(axis=1)
+    df_out['MOD_SUM_0']  = df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1)
+    df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1)
+    df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1)
+    tclist                   = df_passThres.fillna(0).apply(lambda x: np.array(x>0).astype(int),axis=1)
+    def makeCHARGEQ(row):
+        charges = np.array(row.dropna())
+        return np.pad(charges,(0,48-len(charges)),mode='constant',constant_values=0)
+    qlist                  = df_passThres.apply(makeCHARGEQ,axis=1)
+    df_out[CHARGEQ_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_headers)
+    df_out[ADD_headers]     = pd.DataFrame(tclist.values.tolist(),index=tclist.index,columns=ADD_headers)
+
+    return df_out
+
+
+def writeInputCSV(df):
+    #output of switch matrix ( i.e. decoded charge)
+    SM_headers = ["SM_%s"%i for i in range(0,48)]
+    #output of Calibration ( i.e. calib charge)
+    CALQ_headers = ["CALQ_%s"%i for i in range(0,48)]
+
+    gb = df.groupby(['entry','subdet','layer','wafer'],group_keys=False)
+
+    smlist   = gb[['triggercell','decodedCharge']].apply(makeTCindexCols,'decodedCharge',-1)
+    calQlist = gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',-1)
+
+    df_out     = pd.DataFrame(index=smlist.index)
+    df_out[SM_headers]     = pd.DataFrame((smlist).values.tolist(),index=smlist.index)
+    df_out[CALQ_headers]   = pd.DataFrame((calQlist).values.tolist(),index=calQlist.index)
+    df_out.fillna(0,inplace=True)
+    df_out.to_csv("SM_output.csv"  ,columns=SM_headers,index=False)
+    df_out.to_csv("CALQ_output.csv",columns=CALQ_headers,index=False)
+    return
 
 def main(args):
 
@@ -194,16 +250,17 @@ def main(args):
 
     geomDF          =   getGeomDF()
     customCharge_df =   processTree(_tree,geomDF,subdet,layer,wafer)
-    df_algo         =   getAlgoBlockOutputDF(customCharge_df)
-
-    ADD = ["ADDMAP_%s"%i for i in range(0,48)]
-    CHARGEQ = ["CHARGEQ_%s"%i for i in range(0,48)]
-    cols = np.array(df_algo.columns.tolist())
-    OTHERS = np.logical_and(~np.in1d(cols,ADD),~np.in1d(cols,CHARGEQ))
-    
-    df_algo.to_csv('Algo_AddMap.csv',columns=ADD,index=False)
-    df_algo.to_csv('Algo_ChargeQ.csv',columns=CHARGEQ,index=False)
-    df_algo.to_csv('Algo_OTHERS.csv',columns=OTHERS,index=False)
+    #writeInputCSV( customCharge_df)
+    #df_algo         =   getAlgoBlockOutputDF(customCharge_df)
+    df_algo         =   getAlgoBlock('CALQ_output.csv','thres_D3L5W31.csv','calib_D3L5W31.csv')
+    df_algo.to_csv('xcheck.csv',index=False)
+    #ADD = ["ADDMAP_%s"%i for i in range(0,48)]
+    #CHARGEQ = ["CHARGEQ_%s"%i for i in range(0,48)]
+    #cols = np.array(df_algo.columns.tolist())
+    #OTHERS = np.logical_and(~np.in1d(cols,ADD),~np.in1d(cols,CHARGEQ))
+    #df_algo.to_csv('Algo_AddMap.csv',columns=ADD,index=False)
+    #df_algo.to_csv('Algo_ChargeQ.csv',columns=CHARGEQ,index=False)
+    #df_algo.to_csv('Algo_OTHERS.csv',columns=OTHERS,index=False)
 
 if __name__=='__main__':
     parser = optparse.OptionParser()

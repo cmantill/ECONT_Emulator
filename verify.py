@@ -234,8 +234,15 @@ def writeThresholdFormat(d_csv):
     
     df_wafer['CHARGEQ'] = df_charge.apply(list,axis=1)
     df_wafer['ADD_MAP'] = df_addmap.apply(list,axis=1)
-    
-    df_wafer ['FRAMEQ'] = df_wafer.apply(formatThresholdOutput,axis=1)
+   
+    debug = False
+    nDropbit = 1
+    if not debug: 
+        df_wafer['FRAMEQ'] = df_wafer.apply(formatThresholdOutput,args=(nDropbit,debug),axis=1)
+    else:
+        bit_str = df_wafer.apply(formatThresholdOutput,args=(nDropbit,debug),axis=1)
+        cols          = ['header', 'dataType' , 'modSumData' ,'extraBit' ,'nChannelData' , 'AddressMapData' ,'ChargeData']
+        df_wafer[cols] = pd.DataFrame(bit_str.values.tolist(), index=bit_str.index)
     df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ'],index=False)
     return
 
@@ -275,7 +282,7 @@ def main(opt,args):
         'bc_charge' :'bc_charge.csv',   #output
         'bc_address':'bc_address.csv',  #output
     }
-    writeBestChoice(bc_inputcsv)
+    #writeBestChoice(bc_inputcsv)
     format_inputcsv ={
         'wafer_csv' :'xcheck_others.csv',   #input
         'add_csv'   :'xcheck_ADD.csv',      #input

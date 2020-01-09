@@ -20,6 +20,7 @@ def processTree(_tree,geomDF, subdet,layer,wafer):
 
     #remove unwanted layers
     df = df[(df.subdet==subdet) & (df.layer==layer) & ( df.wafer==wafer)  ]
+    #df = df[(df.subdet==subdet) & (df.layer==layer)   ]
 
     #set index
     df.set_index(['subdet','zside','layer','wafer','triggercell'],append=True,inplace=True)
@@ -128,43 +129,13 @@ def makeTCindexCols(group,col,iMOD=-1):
     elif iMOD==2: modsum = charges[32:48].sum().round().astype(np.int)                                             
     return modsum
 
-### the Threshold algo block from Ntuple directly
-def getAlgoBlockOutputDF(df):
-    sumEncoding=(0,5,3) 
-    tcEncoding=(0,4,4)
-
-    df_thres = df[df.pass_135==True]
-    
-    gb = df.groupby(['entry','subdet','layer','wafer'],group_keys=False)
-    gb_thres = df_thres.groupby(['entry','subdet','layer','wafer'],group_keys=False)
-    
-    ADD_headers = ["ADDMAP_%s"%i for i in range(0,48)]
-    CHARGEQ_headers = ["CHARGEQ_%s"%i for i in range(0,48)]
-    
-    
-    df_out = pd.DataFrame(gb.sum()['calibCharge'].round().astype(np.int))
-    df_out.rename(columns={"calibCharge":"SUM"},inplace=True)
-    
-    df_out['NTCQ'] = gb_thres.count()['pass_135']
-
-    tclist = pd.DataFrame(gb_thres['triggercell'].apply(makeAddMAP))
-    qlist  = pd.DataFrame(gb_thres['calibCharge'].apply(makeCHARGEQ))
-    df_out[ADD_headers]     = pd.DataFrame((tclist)['triggercell'].values.tolist(),index=tclist.index)
-    df_out[CHARGEQ_headers] = pd.DataFrame((qlist)['calibCharge'].values.tolist(),index=qlist.index)
-    df_out['MOD_SUM_0']     =pd.DataFrame(gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',0))
-    df_out['MOD_SUM_1']     =pd.DataFrame(gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',1))   
-    df_out['MOD_SUM_2']     =pd.DataFrame(gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',2))  
-
-    df_out.fillna(0,inplace=True)        ## fill 0 for entries without any TC passing threshold 
-
-    return df_out
 
 ### the Threshold algo block from CSV inputs
-def getThresAlgoBlock(calQ_csv,thres_csv,calib_csv):
+def writeThresAlgoBlock(d_csv):
 
-    df = pd.read_csv(calQ_csv)
-    df_thres = pd.read_csv(thres_csv)       ## CSV with 1 entry: decodedCharge thresholds of 48 triggercells
-    df_calib = pd.read_csv(calib_csv)       ## CSV with 1 entry: calibration factor of 48 triggercells
+    df = pd.read_csv(d_csv['calQ_csv'])
+    df_thres = pd.read_csv(d_csv['thres_csv'])       ## CSV with 1 entry: decodedCharge thresholds of 48 triggercells
+    df_calib = pd.read_csv(d_csv['calib_csv'])       ## CSV with 1 entry: calibration factor of 48 triggercells
 
     df_passThres = pd.DataFrame(index = df.index,columns = df.columns)
 
@@ -194,6 +165,14 @@ def getThresAlgoBlock(calQ_csv,thres_csv,calib_csv):
     qlist                  = df_passThres.apply(makeCHARGEQ,axis=1)
     df_out[CHARGEQ_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_headers)
     df_out[ADD_headers]     = pd.DataFrame(tclist.values.tolist(),index=tclist.index,columns=ADD_headers)
+
+    ## output to CSV
+    cols = np.array(df_out.columns.tolist())
+    WAFER = np.logical_and(~np.in1d(cols,ADD_headers),~np.in1d(cols,CHARGEQ_headers))
+    df_out.to_csv(d_csv['thres_charge_csv' ],columns=CHARGEQ_headers,index=False)
+    df_out.to_csv(d_csv['thres_address_csv'],columns=ADD_headers,index=False)
+    df_out.to_csv(d_csv['thres_wafer_csv'  ],columns=WAFER,index=False)
+
 
     return df_out
 
@@ -275,10 +254,17 @@ def main(opt,args):
     geomDF          =   getGeomDF()
     customCharge_df =   processTree(_tree,geomDF,subdet,layer,wafer)
     writeInputCSV( odir,  customCharge_df, geomDF, subdet,layer,wafer)
-    #df_algo         =   getAlgoBlockOutputDF(customCharge_df)
-    df_algo         =   getThresAlgoBlock('CALQ_output.csv','thres_D3L5W31.csv','calib_D3L5W31.csv')
+    threshold_inputcsv ={
+        'calQ_csv'          :'CALQ_output.csv', #input
+        'thres_csv'         :'thres_D3L5W31.csv', #input threshold
+        'calib_csv'         :'calib_D3L5W31.csv', #input calibration
+        'thres_charge_csv' :'threshold_charge.csv',   #output
+        'thres_address_csv':'threshold_address.csv',  #output
+        'thres_wafer_csv'  :'threshold_wafer.csv',  #output
+    }
+    df_algo         =   writeThresAlgoBlock(threshold_inputcsv)
     bc_inputcsv ={
-        'cal_csv'   :'CALQ_output.csv', #input
+        'calQ_csv'   :'CALQ_output.csv', #input
         'bc_charge' :'bc_charge.csv',   #output
         'bc_address':'bc_address.csv',  #output
     }
@@ -289,15 +275,8 @@ def main(opt,args):
         'charge_csv':'xcheck_charge.csv',   #input
         'format_csv':'formatblock.csv'      #output
     }
-    writeThresholdFormat(format_inputcsv)
+    #writeThresholdFormat(format_inputcsv)
     
-    ADD = ["ADDMAP_%s"%i for i in range(0,48)]
-    CHARGEQ = ["CHARGEQ_%s"%i for i in range(0,48)]
-    cols = np.array(df_algo.columns.tolist())
-    WAFER = np.logical_and(~np.in1d(cols,ADD),~np.in1d(cols,CHARGEQ))
-    df_algo.to_csv('%s/xcheck_charge.csv'%odir,columns=CHARGEQ,index=False)
-    df_algo.to_csv('%s/xcheck_ADD.csv'   %odir,columns=ADD,index=False)
-    #df_algo.to_csv('%s/xcheck_WAFER.csv'%odir,columns=WAFER,index=False)
 
 if __name__=='__main__':
     parser = optparse.OptionParser()

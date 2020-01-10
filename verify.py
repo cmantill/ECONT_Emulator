@@ -72,7 +72,8 @@ def processTree(_tree,geomDF, subdet,layer,wafer):
     #df.decodedCharge.fillna(0,inplace=True)
     df['calibCharge'] = (df.decodedCharge * df.corrFactor_finite)#.round().astype(np.int)
 
-    df['pass_135'] = df.decodedCharge>df.threshold_ADC
+    #threshold ADC is threshold in transverse charge
+    df['pass_135'] = df.decodedCharge>(df.threshold_ADC/df.corrFactor)
 
     return df
 
@@ -100,7 +101,7 @@ def getGeomDF():
     
     threshold_mipPt = 1.35
     fCtoADC = 100./1024.
-    geomDF['threshold_fC'] = threshold_mipPt*np.cosh(geomDF.eta) *3.43
+    geomDF['threshold_fC'] = threshold_mipPt* 3.43      ## threshold on transverse charge
     geomDF['threshold_ADC'] = np.round(geomDF.threshold_fC/fCtoADC).astype(np.int)
     precision = 2**-11
     geomDF['corrFactor_finite']    = round(1./np.cosh(geomDF.eta) / precision) * precision
@@ -135,12 +136,11 @@ def writeThresAlgoBlock(d_csv):
 
     df = pd.read_csv(d_csv['calQ_csv'])
     df_thres = pd.read_csv(d_csv['thres_csv'])       ## CSV with 1 entry: decodedCharge thresholds of 48 triggercells
-    df_calib = pd.read_csv(d_csv['calib_csv'])       ## CSV with 1 entry: calibration factor of 48 triggercells
 
     df_passThres = pd.DataFrame(index = df.index,columns = df.columns)
 
-    #threshold calibCharge = threshold * calibFactor
-    calib_thres  = np.array(df_thres.loc[0].tolist()) * np.array(df_calib.loc[0].tolist())
+    #threshold calibCharge = threshold 
+    calib_thres  = np.array(df_thres.loc[0].tolist()) 
     #Filter all 48 columns
     for i in range(0,48):
         df_passThres['CALQ_%i'%i] = df[df['CALQ_%i'%i]> calib_thres[i] ]['CALQ_%i'%i]
@@ -255,27 +255,26 @@ def main(opt,args):
     customCharge_df =   processTree(_tree,geomDF,subdet,layer,wafer)
     writeInputCSV( odir,  customCharge_df, geomDF, subdet,layer,wafer)
     threshold_inputcsv ={
-        'calQ_csv'          :'CALQ_output.csv', #input
-        'thres_csv'         :'thres_D3L5W31.csv', #input threshold
-        'calib_csv'         :'calib_D3L5W31.csv', #input calibration
+        'calQ_csv'         :'CALQ_output.csv', #input
+        'thres_csv'        :'thres_D3L5W31.csv', #input threshold
         'thres_charge_csv' :'threshold_charge.csv',   #output
         'thres_address_csv':'threshold_address.csv',  #output
         'thres_wafer_csv'  :'threshold_wafer.csv',  #output
     }
     df_algo         =   writeThresAlgoBlock(threshold_inputcsv)
     bc_inputcsv ={
-        'calQ_csv'   :'CALQ_output.csv', #input
-        'bc_charge' :'bc_charge.csv',   #output
-        'bc_address':'bc_address.csv',  #output
+        'calQ_csv'      :'CALQ_output.csv', #input
+        'bc_charge_csv' :'bc_charge.csv',   #output
+        'bc_address_csv':'bc_address.csv',  #output
     }
-    #writeBestChoice(bc_inputcsv)
+    writeBestChoice(bc_inputcsv)
     format_inputcsv ={
-        'wafer_csv' :'xcheck_others.csv',   #input
-        'add_csv'   :'xcheck_ADD.csv',      #input
-        'charge_csv':'xcheck_charge.csv',   #input
-        'format_csv':'formatblock.csv'      #output
+        'wafer_csv' :'threshold_wafer.csv',   #input
+        'add_csv'   :'threshold_address.csv',      #input
+        'charge_csv':'threshold_charge.csv',   #input
+        'format_csv':'threshold_formatblock.csv'      #output
     }
-    #writeThresholdFormat(format_inputcsv)
+    writeThresholdFormat(format_inputcsv)
     
 
 if __name__=='__main__':

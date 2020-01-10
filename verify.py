@@ -146,7 +146,7 @@ def writeThresAlgoBlock(d_csv):
         df_passThres['CALQ_%i'%i] = df[df['CALQ_%i'%i]> calib_thres[i] ]['CALQ_%i'%i]
 
     df_out       = pd.DataFrame(index = df.index)
-    ADD_headers     = ["ADDMAP_%s"%i for i in range(0,48)]
+    ADD_headers     = ["ADDRMAP_%s"%i for i in range(0,48)]
     CHARGEQ_headers = ["CHARGEQ_%s"%i for i in range(0,48)]
 
     df_out['NTCQ'] = df_passThres.count(axis=1)         #df_passThres has NAN for TC below threshold
@@ -156,8 +156,15 @@ def writeThresAlgoBlock(d_csv):
     df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 32-48 TC regardless of threshold
 
     def makeCHARGEQ(row):
-        charges = np.array(row.dropna()).astype(int)
-        return np.pad(charges,(0,48-len(charges)),mode='constant',constant_values=0)
+        nExp = 4
+        nMant = 3
+        roundBits = True
+        nDropBit = 1 ## TODO: make this configurable
+        asInt  = True
+
+        raw_charges     = np.array(row.dropna()).astype(int)
+        encoded_charges = encodeList(raw_charges,nDropBit,nExp,nMant,roundBits,asInt=True)
+        return np.pad(encoded_charges,(0,48-len(encoded_charges)),mode='constant',constant_values=0)
 
     ## boolean list of 48 TC cells (filled 0 in df_passThres first)
     tclist                   = df_passThres.fillna(0).apply(lambda x: np.array(x>0).astype(int),axis=1)
@@ -215,7 +222,7 @@ def writeThresholdFormat(d_csv):
     df_wafer['ADD_MAP'] = df_addmap.apply(list,axis=1)
    
     debug = False
-    nDropbit = 1
+    nDropbit = 1        ## TODO: make this configurable
     if not debug: 
         df_wafer['FRAMEQ'] = df_wafer.apply(formatThresholdOutput,args=(nDropbit,debug),axis=1)
     else:

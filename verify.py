@@ -1,5 +1,6 @@
 import uproot
 import optparse
+import os
 
 import pandas as pd
 import numpy as np
@@ -253,40 +254,51 @@ def main(opt,args):
     #_tree_tsgbc = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['Floatingpoint8BestchoiceDummyHistomaxGenmatchGenclustersntuple/HGCalTriggerNtuple']
 
     ####Selection of a single wafer
-    subdet = 3
-    layer  = 5
-    wafer  = 31
+    subdet = opt.subdet  
+    layer  = opt.layer   
+    wafer  = opt.wafer   
 
-    odir = opt.odir
+    if opt.odir=='./':
+       odir = './wafer_D%iL%iW%i/'%(opt.subdet,opt.layer,opt.wafer) 
+    else:
+       odir = opt.odir
+    if not os.path.exists(odir):
+       os.mkdir(odir)
+        
     geomDF          =   getGeomDF()
     customCharge_df =   processTree(_tree,geomDF,subdet,layer,wafer)
     writeInputCSV( odir,  customCharge_df, geomDF, subdet,layer,wafer)
     threshold_inputcsv ={
-        'calQ_csv'         :'CALQ_output.csv', #input
-        'thres_csv'        :'thres_D3L5W31.csv', #input threshold
-        'thres_charge_csv' :'threshold_charge.csv',   #output
-        'thres_address_csv':'threshold_address.csv',  #output
-        'thres_wafer_csv'  :'threshold_wafer.csv',  #output
+        'calQ_csv'         :odir+'CALQ_output.csv', #input
+        'thres_csv'        :odir+'thres_D%iL%iW%i.csv'%(subdet,layer,wafer), #input threshold
+        'thres_charge_csv' :odir+'threshold_charge.csv',   #output
+        'thres_address_csv':odir+'threshold_address.csv',  #output
+        'thres_wafer_csv'  :odir+'threshold_wafer.csv',  #output
     }
     df_algo         =   writeThresAlgoBlock(threshold_inputcsv)
     bc_inputcsv ={
-        'calQ_csv'      :'CALQ_output.csv', #input
-        'bc_charge_csv' :'bc_charge.csv',   #output
-        'bc_address_csv':'bc_address.csv',  #output
+        'calQ_csv'      :odir+'CALQ_output.csv', #input
+        'bc_charge_csv' :odir+'bc_charge.csv',   #output
+        'bc_address_csv':odir+'bc_address.csv',  #output
     }
     writeBestChoice(bc_inputcsv)
     format_inputcsv ={
-        'wafer_csv' :'threshold_wafer.csv',   #input
-        'add_csv'   :'threshold_address.csv',      #input
-        'charge_csv':'threshold_charge.csv',   #input
-        'format_csv':'threshold_formatblock.csv'      #output
+        'wafer_csv' :odir+'threshold_wafer.csv',        #input
+        'add_csv'   :odir+'threshold_address.csv',      #input
+        'charge_csv':odir+'threshold_charge.csv',       #input
+        'format_csv':odir+'threshold_formatblock.csv'   #output
     }
     writeThresholdFormat(format_inputcsv)
     
 
 if __name__=='__main__':
     parser = optparse.OptionParser()
+    parser.add_option('-i',"--inputFile", type="string", default = 'ntuple.root',dest="inputFile", help="input TSG ntuple")
     parser.add_option('-o',"--odir", type="string", default = './',dest="odir", help="output directory")
+    parser.add_option('-w',"--wafer" , type=int, default = 32,dest="wafer" , help="which wafer to write")
+    parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")
+    parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
+
     (opt, args) = parser.parse_args()
 
     main(opt,args)

@@ -9,7 +9,9 @@ import matplotlib.pyplot as plt
 
 from encode import encode, decode
 from bestchoice import batcher_sort,sort,sorter
-from format import formatThresholdOutput 
+from linkAllocation import linksPerLayer, tcPerLink
+
+from format import formatThresholdOutput, formatThresholdTruncatedOutput, splitToWords, formatBestChoiceOutput
 encodeList = np.vectorize(encode)
 
 
@@ -215,6 +217,7 @@ def writeInputCSV(odir,df,geomDF,subdet,layer,wafer):
     return
 
 def writeThresholdFormat(d_csv):
+    print('Writing Threshold')
     df_wafer  = pd.read_csv(d_csv['wafer_csv'])
     df_addmap = pd.read_csv(d_csv['add_csv'])
     df_charge = pd.read_csv(d_csv['charge_csv'])
@@ -224,13 +227,19 @@ def writeThresholdFormat(d_csv):
    
     debug = False
     nDropbit = 1        ## TODO: make this configurable
+
     if not debug: 
-        df_wafer['FRAMEQ'] = df_wafer.apply(formatThresholdOutput,args=(nDropbit,debug),axis=1)
+        cols = [f'WORD_{i}' for i in range(25)]
+        df_wafer['FRAMEQ'] = df_wafer.apply(formatThresholdOutput,args=(debug),axis=1)
+        df_wafer['FRAMEQ_TRUNC'] = df_wafer.apply(formatThresholdTruncatedOutput,axis=1)
+        df_wafer[cols] = pd.DataFrame(df_wafer.apply(splitToWords,axis=1).tolist(),columns=cols)
+        df_wafer['WORDCOUNT'] = (df_wafer.FRAMEQ.str.len()/16).astype(int)
     else:
         bit_str = df_wafer.apply(formatThresholdOutput,args=(nDropbit,debug),axis=1)
         cols          = ['header', 'dataType' , 'modSumData' ,'extraBit' ,'nChannelData' , 'AddressMapData' ,'ChargeData']
         df_wafer[cols] = pd.DataFrame(bit_str.values.tolist(), index=bit_str.index)
-    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ'],index=False)
+#    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC'],index=False)
+    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC','WORDCOUNT']+cols,index=False)
     return
 
 def writeBestChoice(d_csv):
@@ -243,15 +252,32 @@ def writeBestChoice(d_csv):
     df_sorted_index.index.name = 'BC'
     df_sorted.to_csv(d_csv['bc_charge_csv'],index=False)
     df_sorted_index.to_csv(d_csv['bc_address_csv'],index=False)
+
+    df_sorted[df_sorted_index.columns] = df_sorted_index
+
+    df_sorted['FRAMEQ'] = df_sorted.apply(formatBestChoiceOutput, args=(d_csv['nTC'],d_csv['isHDM']), axis=1)
+    df_sorted['WORDCOUNT'] = (df_sorted.FRAMEQ.str.len()/16).astype(int)
+    cols = [f'WORD_{i}' for i in range(25)]
+    df_sorted[cols] = pd.DataFrame(df_sorted.apply(splitToWords,axis=1).tolist(),columns=cols)
+
+    df_sorted.to_csv(d_csv['bc_format_csv'],columns=['FRAMEQ','WORDCOUNT']+cols,index=False)    
+
     return
     
 
 def main(opt,args):
+    print('loading')
 
-    fName='ntuple_bc.root'
+    #fName='ntuple_bc.root'
 
-    _tree = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['Floatingpoint8Threshold0DummyHistomaxGenmatchGenclustersntuple/HGCalTriggerNtuple']
+    #_tree = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['Floatingpoint8Threshold0DummyHistomaxGenmatchGenclustersntuple/HGCalTriggerNtuple']
     #_tree_tsgbc = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['Floatingpoint8BestchoiceDummyHistomaxGenmatchGenclustersntuple/HGCalTriggerNtuple']
+    
+    fName = 'root://cmseos.fnal.gov//store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar/ntuple_hgcalNtuples_ttbar_200PU_0.root'
+
+    _tree = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['hgcalTriggerNtuplizer/HGCalTriggerNtuple']
+
+    print('loaded tree')
 
     ####Selection of a single wafer
     subdet = opt.subdet  
@@ -264,8 +290,10 @@ def main(opt,args):
        odir = opt.odir
     if not os.path.exists(odir):
        os.mkdir(odir)
-        
+
+    print ('start')
     geomDF          =   getGeomDF()
+    print ('process tree')
     customCharge_df =   processTree(_tree,geomDF,subdet,layer,wafer)
     writeInputCSV( odir,  customCharge_df, geomDF, subdet,layer,wafer)
     threshold_inputcsv ={
@@ -280,6 +308,9 @@ def main(opt,args):
         'calQ_csv'      :odir+'CALQ_output.csv', #input
         'bc_charge_csv' :odir+'bc_charge.csv',   #output
         'bc_address_csv':odir+'bc_address.csv',  #output
+        'bc_format_csv':odir+'bc_formatblock.csv',  #output
+        'nTC': tcPerLink[linksPerLayer[layer]],
+        'isHDM':customCharge_df.isHDM.any(),
     }
     writeBestChoice(bc_inputcsv)
     format_inputcsv ={

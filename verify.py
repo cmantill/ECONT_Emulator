@@ -146,8 +146,7 @@ def writeThresAlgoBlock(d_csv):
     #default thresholds to high, set ones present in csv to correct values
     calib_thres = np.ones(48,np.int32)*1e9
     calib_thres[df_thres.loc[0].tolist()] = df_thres.loc[1].tolist()
-#    calib_thres  = np.array(df_thres.loc[0].tolist()) 
-    
+    #    calib_thres  = np.array(df_thres.loc[0].tolist()) 
 
     #Filter all 48 columns
     for i in range(0,48):
@@ -193,7 +192,13 @@ def writeThresAlgoBlock(d_csv):
     return df_out
 
 
-def writeInputCSV(odir,df,geomDF,subdet,layer,wafer):
+def writeInputCSV(odir,df,subdet,layer,wafer,appendFile=False):
+    writeMode = 'w'
+    header=True
+    if appendFile:
+        writeMode='a'
+        header=False
+
     #output of switch matrix ( i.e. decoded charge)
     SM_headers = ["SM_%s"%i for i in range(0,48)]
     #output of Calibration ( i.e. calib charge)
@@ -208,9 +213,11 @@ def writeInputCSV(odir,df,geomDF,subdet,layer,wafer):
     df_out[SM_headers]     = pd.DataFrame((smlist).values.tolist(),index=smlist.index)
     df_out[CALQ_headers]   = pd.DataFrame((calQlist).values.tolist(),index=calQlist.index)
     df_out.fillna(0,inplace=True)
-    df_out.to_csv("%s/SM_output.csv"%odir  ,columns=SM_headers,index=False)
-    df_out.to_csv("%s/CALQ_output.csv"%odir,columns=CALQ_headers,index=False)
+    df_out.to_csv("%s/SM_output.csv"%odir  ,columns=SM_headers,index=False, mode=writeMode, header=header)
+    df_out.to_csv("%s/CALQ_output.csv"%odir,columns=CALQ_headers,index=False, mode=writeMode, header=header)
 
+
+def writeRegisters(odir,geomDF,subdet,layer,wafer):
     ## write subsidary files
     df_geom = geomDF.reset_index()
     df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & ( df_geom.wafer==wafer) & (df_geom.zside==1) ]
@@ -219,6 +226,9 @@ def writeInputCSV(odir,df,geomDF,subdet,layer,wafer):
     df_geom['corrFactor_finite']    = round(1./np.cosh(df_geom.eta) / precision) * precision
     df_geom[['triggercell','corrFactor_finite']].transpose().to_csv("%s/calib_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
     df_geom[['triggercell','threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
+    with open("%s/registers_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),'w') as outFile:
+        outFile.write('isHDM\n')
+        outFile.write(f'{df_geom.isHDM.any()}\n')
 
     return
 
@@ -243,6 +253,7 @@ def writeThresholdFormat(d_csv):
         bit_str = df_wafer.apply(formatThresholdOutput,args=(nDropbit,debug),axis=1)
         cols          = ['header', 'dataType' , 'modSumData' ,'extraBit' ,'nChannelData' , 'AddressMapData' ,'ChargeData']
         df_wafer[cols] = pd.DataFrame(bit_str.values.tolist(), index=bit_str.index)
+
 #    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC'],index=False)
     df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC','WORDCOUNT']+cols,index=False)
     return
@@ -258,80 +269,106 @@ def writeBestChoice(d_csv):
     df_sorted.to_csv(d_csv['bc_charge_csv'],index=False)
     df_sorted_index.to_csv(d_csv['bc_address_csv'],index=False)
 
+    df_registers = pd.read_csv(d_csv['register_csv'])
+    isHDM = df_registers.isHDM.loc[0]
+
     df_sorted[df_sorted_index.columns] = df_sorted_index
 
-    df_sorted['FRAMEQ'] = df_sorted.apply(formatBestChoiceOutput, args=(d_csv['nTC'],d_csv['isHDM']), axis=1)
+    df_sorted['FRAMEQ'] = df_sorted.apply(formatBestChoiceOutput, args=(d_csv['nTC'],isHDM), axis=1)
     df_sorted['WORDCOUNT'] = (df_sorted.FRAMEQ.str.len()/16).astype(int)
     cols = [f'WORD_{i}' for i in range(25)]
     df_sorted[cols] = pd.DataFrame(df_sorted.apply(splitToWords,axis=1).tolist(),columns=cols)
 
-    df_sorted.to_csv(d_csv['bc_format_csv'],columns=['FRAMEQ','WORDCOUNT']+cols,index=False)    
+    df_sorted.to_csv(d_csv['bc_format_csv'],columns=['FRAMEQ','WORDCOUNT']+cols,index=False)
 
     return
-    
 
-def main(opt,args):
-    print('loading')
 
-    #fName='ntuple_bc.root'
 
-    #_tree = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['Floatingpoint8Threshold0DummyHistomaxGenmatchGenclustersntuple/HGCalTriggerNtuple']
-    #_tree_tsgbc = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['Floatingpoint8BestchoiceDummyHistomaxGenmatchGenclustersntuple/HGCalTriggerNtuple']
-    
-    fName = 'root://cmseos.fnal.gov//store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar/ntuple_hgcalNtuples_ttbar_200PU_0.root'
+def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, appendFile=False):
 
     _tree = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['hgcalTriggerNtuplizer/HGCalTriggerNtuple']
 
-    print('loaded tree')
+    print(f'loaded tree {fName}')
+    # print(_tree.numentries)
+    # writeMode='a' if appendFile else 'w'
+    # print (writeMode)
 
-    ####Selection of a single wafer
-    subdet = opt.subdet  
-    layer  = opt.layer   
-
-    print ('start')
-    geomDF          =   getGeomDF()
     print ('process tree')
     Layer_df =   processTree(_tree,geomDF,subdet,layer)
     waferList = Layer_df.wafer.unique()
-    if not opt.wafer==-1:
-        waferList = [opt.wafer]
-    for wafer in waferList:
-        if opt.odir=='./':
-            odir = 'wafer_D%iL%iW%i/'%(subdet,layer,wafer) 
+    if not wafer==-1:
+        waferList = [wafer]
+    print (waferList)
+    for _wafer in waferList:
+        if odir=='./':
+            waferDir = 'wafer_D%iL%iW%i/'%(subdet,layer,_wafer) 
         else:
-            odir = '%s/wafer_D%iL%iW%i/'%(opt.odir,subdet,layer,wafer) 
-        os.makedirs(odir, exist_ok=True)
-#            odir = opt.odir
-#        if not os.path.exists(odir):
+            waferDir = '%s/wafer_D%iL%iW%i/'%(odir,subdet,layer,_wafer) 
+        if not os.path.exists(waferDir):
+            os.makedirs(waferDir, exist_ok=True)
 
-        customCharge_df = Layer_df[Layer_df.wafer==wafer].set_index(['entry','subdet','layer','wafer'])
-        print (f'loaded wafer {wafer}')
-        writeInputCSV( odir,  customCharge_df, geomDF, subdet,layer,wafer)
+        customCharge_df = Layer_df[Layer_df.wafer==_wafer].set_index(['entry','subdet','layer','wafer'])
+        print (f'loaded wafer {_wafer}')
+        writeInputCSV( waferDir,  customCharge_df, subdet,layer,_wafer,appendFile)
+        if not appendFile:
+            writeRegisters( waferDir,  geomDF, subdet,layer,_wafer)
+            
+    return waferList
+
+def runAlgos(subdet, layer, waferList, odir):
+    for _wafer in waferList:
+        if odir=='./':
+            waferDir = 'wafer_D%iL%iW%i/'%(subdet,layer,_wafer) 
+        else:
+            waferDir = '%s/wafer_D%iL%iW%i/'%(odir,subdet,layer,_wafer) 
+
         threshold_inputcsv ={
-            'calQ_csv'         :odir+'CALQ_output.csv', #input
-            'thres_csv'        :odir+'thres_D%iL%iW%i.csv'%(subdet,layer,wafer), #input threshold
-            'thres_charge_csv' :odir+'threshold_charge.csv',   #output
-            'thres_address_csv':odir+'threshold_address.csv',  #output
-            'thres_wafer_csv'  :odir+'threshold_wafer.csv',  #output
+            'calQ_csv'         :waferDir+'CALQ_output.csv', #input
+            'thres_csv'        :waferDir+'thres_D%iL%iW%i.csv'%(subdet,layer,_wafer), #input threshold
+            'thres_charge_csv' :waferDir+'threshold_charge.csv',   #output
+            'thres_address_csv':waferDir+'threshold_address.csv',  #output
+            'thres_wafer_csv'  :waferDir+'threshold_wafer.csv',  #output
         }
         df_algo         =   writeThresAlgoBlock(threshold_inputcsv)
         bc_inputcsv ={
-            'calQ_csv'      :odir+'CALQ_output.csv', #input
-            'bc_charge_csv' :odir+'bc_charge.csv',   #output
-            'bc_address_csv':odir+'bc_address.csv',  #output
-            'bc_format_csv':odir+'bc_formatblock.csv',  #output
+            'calQ_csv'      :waferDir+'CALQ_output.csv', #input
+            'bc_charge_csv' :waferDir+'bc_charge.csv',   #output
+            'bc_address_csv':waferDir+'bc_address.csv',  #output
+            'bc_format_csv' :waferDir+'bc_formatblock.csv',  #output
+            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
             'nTC': tcPerLink[linksPerLayer[layer]],
-            'isHDM':customCharge_df.isHDM.any(),
         }
         writeBestChoice(bc_inputcsv)
         format_inputcsv ={
-            'wafer_csv' :odir+'threshold_wafer.csv',        #input
-            'add_csv'   :odir+'threshold_address.csv',      #input
-            'charge_csv':odir+'threshold_charge.csv',       #input
-            'format_csv':odir+'threshold_formatblock.csv'   #output
+            'wafer_csv' :waferDir+'threshold_wafer.csv',        #input
+            'add_csv'   :waferDir+'threshold_address.csv',      #input
+            'charge_csv':waferDir+'threshold_charge.csv',       #input
+            'format_csv':waferDir+'threshold_formatblock.csv'   #output
         }
         writeThresholdFormat(format_inputcsv)
     
+    
+
+def main(opt,args):
+    print ('start')
+
+    if not opt.skipInput:
+        print('loading')
+
+        geomDF = getGeomDF()
+        for i in [0,2]:
+            fName = f'root://cmseos.fnal.gov//store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar/ntuple_hgcalNtuples_ttbar_200PU_{i}.root'
+            waferList = processNtupleInputs(fName, geomDF, opt.subdet, opt.layer, opt.wafer, opt.odir, appendFile=i>0)
+    else:
+        if not opt.wafer==-1:
+            waferList = [opt.wafer]
+        else:
+            df_geom = getGeomDF()
+            df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & (df_geom.zside==1) ]
+
+            waferList = df_geom.wafer.unique()
+    runAlgos(opt.subdet, opt.layer, waferList, opt.odir)
 
 if __name__=='__main__':
     parser = optparse.OptionParser()
@@ -340,6 +377,7 @@ if __name__=='__main__':
     parser.add_option('-w',"--wafer" , type=int, default = -1,dest="wafer" , help="which wafer to write")
     parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
+    parser.add_option("--skipInput", default = False, action='store_true',dest="skipInput", help="skip the read in step, only run algorithms on csv already there")
 
     (opt, args) = parser.parse_args()
 

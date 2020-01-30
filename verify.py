@@ -20,7 +20,7 @@ encodeList = np.vectorize(encode)
 def processTree(_tree,geomDF, subdet,layer):
     #load dataframe
     print('load dataframe')
-    df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'])
+    df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystop=2)
     df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt']
 
 
@@ -198,6 +198,28 @@ def writeThresAlgoBlock(d_csv):
     return df_out
 
 
+InputLinkGrouping = [[ 0,  1,  2,  3],
+                     [ 4,  5,  6,  7],
+                     [ 8,  9, 10, 11],
+                     [12, 13, 14, 15],
+                     [16, 17, 18, 19],
+                     [20, 21, 22, 23],
+                     [24, 25, 26, 27],
+                     [28, 29, 30, 31],
+                     [32, 33, 34, 35],
+                     [36, 37, 38, 39],
+                     [40, 41, 42, 43],
+                     [44, 45, 46, 47]]
+
+def packIntoInputLinks(row):
+    ENC_headers = ["ENCODED_%s"%i for i in range(0,48)]
+    ENC_values = row[ENC_headers].values
+    ENC_BIN = np.array([format(x, '#0%ib'%(9))[2:] for x in ENC_values])
+    LINK = np.array([ENC_BIN[lgroup][0]+ENC_BIN[lgroup][1]+ENC_BIN[lgroup][2]+ENC_BIN[lgroup][3] for lgroup in InputLinkGrouping])
+
+    return LINK
+
+
 def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
     writeMode = 'w'
     header=True
@@ -205,6 +227,8 @@ def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
         writeMode='a'
         header=False
 
+    EPORTRX_headers = ["ePortRxDataGroup_%s"%i for i in range(0,12)]
+    ENCODED_headers = ["ENCODED_%s"%i for i in range(0,48)]
     #output of switch matrix ( i.e. decoded charge)
     SM_headers = ["SM_%s"%i for i in range(0,48)]
     #output of Calibration ( i.e. calib charge)
@@ -213,13 +237,17 @@ def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
     gb = df.groupby(['wafer','entry'],group_keys=False)
 #    gb = df.groupby(['subdet','layer','wafer','entry'],group_keys=False)
 
+    encodedlist   = gb[['triggercell','encodedCharge']].apply(makeTCindexCols,'encodedCharge',-1)
     smlist   = gb[['triggercell','decodedCharge']].apply(makeTCindexCols,'decodedCharge',-1)
     calQlist = gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',-1)
 
     df_out     = pd.DataFrame(index=smlist.index)
+    df_out[ENCODED_headers]= pd.DataFrame((encodedlist).values.tolist(),index=encodedlist.index)
     df_out[SM_headers]     = pd.DataFrame((smlist).values.tolist(),index=smlist.index)
     df_out[CALQ_headers]   = pd.DataFrame((calQlist).values.tolist(),index=calQlist.index)
     df_out.fillna(0,inplace=True)
+
+    df_out[EPORTRX_headers] = pd.DataFrame(df_out.apply(packIntoInputLinks,axis=1).tolist(),columns=EPORTRX_headers,index=encodedlist.index)
 
     for _wafer in waferList:
         if odir=='./':
@@ -235,6 +263,7 @@ def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
         # df_out.fillna(0,inplace=True)
         df_out.loc[_wafer].to_csv("%s/SM_output.csv"%waferDir  ,columns=SM_headers,index=False, mode=writeMode, header=header)
         df_out.loc[_wafer].to_csv("%s/CALQ_output.csv"%waferDir,columns=CALQ_headers,index=False, mode=writeMode, header=header)
+        df_out.loc[_wafer].to_csv("%s/EPORTRX_output.csv"%waferDir,columns=EPORTRX_headers,index=False, mode=writeMode, header=header)
 
 
 def writeRegisters(odir,geomDF,subdet,layer,waferList):

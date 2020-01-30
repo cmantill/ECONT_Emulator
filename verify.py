@@ -15,15 +15,15 @@ from format import formatThresholdOutput, formatThresholdTruncatedOutput, splitT
 encodeList = np.vectorize(encode)
 
 
-def processTree(_tree,geomDF, subdet,layer,wafer):
+def processTree(_tree,geomDF, subdet,layer):
     #load dataframe
     df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'])
     df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt']
 
 
     #remove unwanted layers
-    df = df[(df.subdet==subdet) & (df.layer==layer) & ( df.wafer==wafer)  ]
-    #df = df[(df.subdet==subdet) & (df.layer==layer)   ]
+#    df = df[(df.subdet==subdet) & (df.layer==layer) & ( df.wafer==wafer)  ]
+    df = df[(df.subdet==subdet) & (df.layer==layer)   ]
 
     #set index
     df.set_index(['subdet','zside','layer','wafer','triggercell'],append=True,inplace=True)
@@ -78,7 +78,7 @@ def processTree(_tree,geomDF, subdet,layer,wafer):
     #threshold ADC is threshold in transverse charge
     df['pass_135'] = df.decodedCharge>(df.threshold_ADC/df.corrFactor)
 
-    return df
+    return df.reset_index()
 
 
 def getGeomDF():
@@ -138,12 +138,17 @@ def makeTCindexCols(group,col,iMOD=-1):
 def writeThresAlgoBlock(d_csv):
 
     df = pd.read_csv(d_csv['calQ_csv'])
-    df_thres = pd.read_csv(d_csv['thres_csv'])       ## CSV with 1 entry: decodedCharge thresholds of 48 triggercells
-
+    df_thres = pd.read_csv(d_csv['thres_csv'],header=None)       ## CSV with 1 entry: decodedCharge thresholds of 48 triggercells
+    
     df_passThres = pd.DataFrame(index = df.index,columns = df.columns)
 
     #threshold calibCharge = threshold 
-    calib_thres  = np.array(df_thres.loc[0].tolist()) 
+    #default thresholds to high, set ones present in csv to correct values
+    calib_thres = np.ones(48,np.int32)*1e9
+    calib_thres[df_thres.loc[0].tolist()] = df_thres.loc[1].tolist()
+#    calib_thres  = np.array(df_thres.loc[0].tolist()) 
+    
+
     #Filter all 48 columns
     for i in range(0,48):
         df_passThres['CALQ_%i'%i] = df[df['CALQ_%i'%i]> calib_thres[i] ]['CALQ_%i'%i]
@@ -172,6 +177,7 @@ def writeThresAlgoBlock(d_csv):
     ## boolean list of 48 TC cells (filled 0 in df_passThres first)
     tclist                   = df_passThres.fillna(0).apply(lambda x: np.array(x>0).astype(int),axis=1)
     ## calibCharge list of passing TC cells, padding zeros after list 
+
     qlist                  = df_passThres.apply(makeCHARGEQ,axis=1)
     df_out[CHARGEQ_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_headers)
     df_out[ADD_headers]     = pd.DataFrame(tclist.values.tolist(),index=tclist.index,columns=ADD_headers)
@@ -211,13 +217,12 @@ def writeInputCSV(odir,df,geomDF,subdet,layer,wafer):
     df_geom = df_geom.reset_index(drop=True)
     precision  = 2**-11
     df_geom['corrFactor_finite']    = round(1./np.cosh(df_geom.eta) / precision) * precision
-    df_geom[['corrFactor_finite']].transpose().to_csv("%s/calib_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False)
-    df_geom[['threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False)
+    df_geom[['triggercell','corrFactor_finite']].transpose().to_csv("%s/calib_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
+    df_geom[['triggercell','threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
 
     return
 
 def writeThresholdFormat(d_csv):
-    print('Writing Threshold')
     df_wafer  = pd.read_csv(d_csv['wafer_csv'])
     df_addmap = pd.read_csv(d_csv['add_csv'])
     df_charge = pd.read_csv(d_csv['charge_csv'])
@@ -282,51 +287,57 @@ def main(opt,args):
     ####Selection of a single wafer
     subdet = opt.subdet  
     layer  = opt.layer   
-    wafer  = opt.wafer   
-
-    if opt.odir=='./':
-       odir = './wafer_D%iL%iW%i/'%(opt.subdet,opt.layer,opt.wafer) 
-    else:
-       odir = opt.odir
-    if not os.path.exists(odir):
-       os.mkdir(odir)
 
     print ('start')
     geomDF          =   getGeomDF()
     print ('process tree')
-    customCharge_df =   processTree(_tree,geomDF,subdet,layer,wafer)
-    writeInputCSV( odir,  customCharge_df, geomDF, subdet,layer,wafer)
-    threshold_inputcsv ={
-        'calQ_csv'         :odir+'CALQ_output.csv', #input
-        'thres_csv'        :odir+'thres_D%iL%iW%i.csv'%(subdet,layer,wafer), #input threshold
-        'thres_charge_csv' :odir+'threshold_charge.csv',   #output
-        'thres_address_csv':odir+'threshold_address.csv',  #output
-        'thres_wafer_csv'  :odir+'threshold_wafer.csv',  #output
-    }
-    df_algo         =   writeThresAlgoBlock(threshold_inputcsv)
-    bc_inputcsv ={
-        'calQ_csv'      :odir+'CALQ_output.csv', #input
-        'bc_charge_csv' :odir+'bc_charge.csv',   #output
-        'bc_address_csv':odir+'bc_address.csv',  #output
-        'bc_format_csv':odir+'bc_formatblock.csv',  #output
-        'nTC': tcPerLink[linksPerLayer[layer]],
-        'isHDM':customCharge_df.isHDM.any(),
-    }
-    writeBestChoice(bc_inputcsv)
-    format_inputcsv ={
-        'wafer_csv' :odir+'threshold_wafer.csv',        #input
-        'add_csv'   :odir+'threshold_address.csv',      #input
-        'charge_csv':odir+'threshold_charge.csv',       #input
-        'format_csv':odir+'threshold_formatblock.csv'   #output
-    }
-    writeThresholdFormat(format_inputcsv)
+    Layer_df =   processTree(_tree,geomDF,subdet,layer)
+    waferList = Layer_df.wafer.unique()
+    if not opt.wafer==-1:
+        waferList = [opt.wafer]
+    for wafer in waferList:
+        if opt.odir=='./':
+            odir = 'wafer_D%iL%iW%i/'%(subdet,layer,wafer) 
+        else:
+            odir = '%s/wafer_D%iL%iW%i/'%(opt.odir,subdet,layer,wafer) 
+        os.makedirs(odir, exist_ok=True)
+#            odir = opt.odir
+#        if not os.path.exists(odir):
+
+        customCharge_df = Layer_df[Layer_df.wafer==wafer].set_index(['entry','subdet','layer','wafer'])
+        print (f'loaded wafer {wafer}')
+        writeInputCSV( odir,  customCharge_df, geomDF, subdet,layer,wafer)
+        threshold_inputcsv ={
+            'calQ_csv'         :odir+'CALQ_output.csv', #input
+            'thres_csv'        :odir+'thres_D%iL%iW%i.csv'%(subdet,layer,wafer), #input threshold
+            'thres_charge_csv' :odir+'threshold_charge.csv',   #output
+            'thres_address_csv':odir+'threshold_address.csv',  #output
+            'thres_wafer_csv'  :odir+'threshold_wafer.csv',  #output
+        }
+        df_algo         =   writeThresAlgoBlock(threshold_inputcsv)
+        bc_inputcsv ={
+            'calQ_csv'      :odir+'CALQ_output.csv', #input
+            'bc_charge_csv' :odir+'bc_charge.csv',   #output
+            'bc_address_csv':odir+'bc_address.csv',  #output
+            'bc_format_csv':odir+'bc_formatblock.csv',  #output
+            'nTC': tcPerLink[linksPerLayer[layer]],
+            'isHDM':customCharge_df.isHDM.any(),
+        }
+        writeBestChoice(bc_inputcsv)
+        format_inputcsv ={
+            'wafer_csv' :odir+'threshold_wafer.csv',        #input
+            'add_csv'   :odir+'threshold_address.csv',      #input
+            'charge_csv':odir+'threshold_charge.csv',       #input
+            'format_csv':odir+'threshold_formatblock.csv'   #output
+        }
+        writeThresholdFormat(format_inputcsv)
     
 
 if __name__=='__main__':
     parser = optparse.OptionParser()
     parser.add_option('-i',"--inputFile", type="string", default = 'ntuple.root',dest="inputFile", help="input TSG ntuple")
     parser.add_option('-o',"--odir", type="string", default = './',dest="odir", help="output directory")
-    parser.add_option('-w',"--wafer" , type=int, default = 32,dest="wafer" , help="which wafer to write")
+    parser.add_option('-w',"--wafer" , type=int, default = -1,dest="wafer" , help="which wafer to write")
     parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
 

@@ -26,16 +26,15 @@ def formatThresholdOutput(row,debug=False):
 
     modSumData = format(SUM, '#0%ib'%(10))[2:]
     extraBit=''
-
     if NTCQ==0:
         nChannelData=''
         AddressMapData=''
         ChargeData=''
     elif NTCQ<8:
         nChannelData=format(NTCQ, '#0%ib'%(3+2))[2:]
-        
-        bitmap = np.array([int(x) for x in format(ADD_MAP, '#0%ib'%(48+2))[2:]][::-1])
-        channelNumbers = np.arange(48)[bitmap==1]
+        # print (ADD_MAP)        
+        # bitmap = np.array([int(x) for x in format(ADD_MAP, '#0%ib'%(48+2))[2:]][::-1])
+        channelNumbers = np.arange(48)[ADD_MAP==1]
         channelNumbersBin = [format(x,'#0%ib'%(6+2))[2:] for x in channelNumbers]
         AddressMapData = ''
         for x in channelNumbersBin: AddressMapData += x

@@ -11,12 +11,15 @@ from encode import encode, decode
 from bestchoice import batcher_sort,sort,sorter
 from linkAllocation import linksPerLayer, tcPerLink
 
+from subprocess import Popen,PIPE
+
 from format import formatThresholdOutput, formatThresholdTruncatedOutput, splitToWords, formatBestChoiceOutput
 encodeList = np.vectorize(encode)
 
 
 def processTree(_tree,geomDF, subdet,layer):
     #load dataframe
+    print('load dataframe')
     df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'])
     df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt']
 
@@ -115,10 +118,25 @@ def makeAddMAP(tclist):
     addmap=np.zeros(48, dtype=int)    #zeros 
     addmap[np.array(list(tclist))]=1  #Mark 1 if tc is present
     return addmap
-def makeCHARGEQ(qlist):
-    #qlist = group of charges in each wafer
-    charges = np.array(list(qlist))     
-    return np.pad(charges,(0,48-len(charges)),mode='constant',constant_values=0)
+# def makeCHARGEQ(qlist):
+#     #qlist = group of charges in each wafer
+#     charges = np.array(list(qlist))     
+#     return np.pad(charges,(0,48-len(charges)),mode='constant',constant_values=0)
+
+def makeCHARGEQ(row):
+    nExp = 4
+    nMant = 3
+    roundBits = False
+    nDropBit = 1 ## TODO: make this configurable
+    asInt  = True
+    
+    raw_charges     = np.array(row.dropna()).astype(int)
+    if len(raw_charges)>0:
+        encoded_charges = encodeList(raw_charges,nDropBit,nExp,nMant,roundBits,asInt=True)
+    else:
+        encoded_charges = np.zeros(48,dtype=int)
+    return np.pad(encoded_charges,(0,48-len(encoded_charges)),mode='constant',constant_values=0)
+    
 
 def makeTCindexCols(group,col,iMOD=-1):
     charges=np.zeros(48, dtype=float)    #zeros
@@ -162,21 +180,9 @@ def writeThresAlgoBlock(d_csv):
     df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 16-32 TC regardless of threshold
     df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 32-48 TC regardless of threshold
 
-    def makeCHARGEQ(row):
-        nExp = 4
-        nMant = 3
-        roundBits = True
-        nDropBit = 1 ## TODO: make this configurable
-        asInt  = True
-
-        raw_charges     = np.array(row.dropna()).astype(int)
-        encoded_charges = encodeList(raw_charges,nDropBit,nExp,nMant,roundBits,asInt=True)
-        return np.pad(encoded_charges,(0,48-len(encoded_charges)),mode='constant',constant_values=0)
-
     ## boolean list of 48 TC cells (filled 0 in df_passThres first)
     tclist                   = df_passThres.fillna(0).apply(lambda x: np.array(x>0).astype(int),axis=1)
     ## calibCharge list of passing TC cells, padding zeros after list 
-
     qlist                  = df_passThres.apply(makeCHARGEQ,axis=1)
     df_out[CHARGEQ_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_headers)
     df_out[ADD_headers]     = pd.DataFrame(tclist.values.tolist(),index=tclist.index,columns=ADD_headers)
@@ -192,7 +198,7 @@ def writeThresAlgoBlock(d_csv):
     return df_out
 
 
-def writeInputCSV(odir,df,subdet,layer,wafer,appendFile=False):
+def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
     writeMode = 'w'
     header=True
     if appendFile:
@@ -204,7 +210,8 @@ def writeInputCSV(odir,df,subdet,layer,wafer,appendFile=False):
     #output of Calibration ( i.e. calib charge)
     CALQ_headers = ["CALQ_%s"%i for i in range(0,48)]
 
-    gb = df.groupby(['entry','subdet','layer','wafer'],group_keys=False)
+    gb = df.groupby(['wafer','entry'],group_keys=False)
+#    gb = df.groupby(['subdet','layer','wafer','entry'],group_keys=False)
 
     smlist   = gb[['triggercell','decodedCharge']].apply(makeTCindexCols,'decodedCharge',-1)
     calQlist = gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',-1)
@@ -213,24 +220,85 @@ def writeInputCSV(odir,df,subdet,layer,wafer,appendFile=False):
     df_out[SM_headers]     = pd.DataFrame((smlist).values.tolist(),index=smlist.index)
     df_out[CALQ_headers]   = pd.DataFrame((calQlist).values.tolist(),index=calQlist.index)
     df_out.fillna(0,inplace=True)
-    df_out.to_csv("%s/SM_output.csv"%odir  ,columns=SM_headers,index=False, mode=writeMode, header=header)
-    df_out.to_csv("%s/CALQ_output.csv"%odir,columns=CALQ_headers,index=False, mode=writeMode, header=header)
+
+    for _wafer in waferList:
+        if odir=='./':
+            waferDir = 'wafer_D%iL%iW%i/'%(subdet,layer,_wafer) 
+        else:
+            waferDir = '%s/wafer_D%iL%iW%i/'%(odir,subdet,layer,_wafer) 
+        if not os.path.exists(waferDir):
+            os.makedirs(waferDir, exist_ok=True)
+        
+        # df_out     = pd.DataFrame(index=smlist.loc[subdet,layer,_wafer].index)
+        # df_out[SM_headers]     = pd.DataFrame((smlist.loc[subdet,layer,_wafer]).values.tolist(),index=smlist.loc[subdet,layer,_wafer].index)
+        # df_out[CALQ_headers]   = pd.DataFrame((calQlist.loc[subdet,layer,_wafer]).values.tolist(),index=calQlist.loc[subdet,layer,_wafer].index)
+        # df_out.fillna(0,inplace=True)
+        df_out.loc[_wafer].to_csv("%s/SM_output.csv"%waferDir  ,columns=SM_headers,index=False, mode=writeMode, header=header)
+        df_out.loc[_wafer].to_csv("%s/CALQ_output.csv"%waferDir,columns=CALQ_headers,index=False, mode=writeMode, header=header)
 
 
-def writeRegisters(odir,geomDF,subdet,layer,wafer):
+def writeRegisters(odir,geomDF,subdet,layer,waferList):
     ## write subsidary files
     df_geom = geomDF.reset_index()
-    df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & ( df_geom.wafer==wafer) & (df_geom.zside==1) ]
+    df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & (df_geom.zside==1) ]
     df_geom = df_geom.reset_index(drop=True)
     precision  = 2**-11
     df_geom['corrFactor_finite']    = round(1./np.cosh(df_geom.eta) / precision) * precision
-    df_geom[['triggercell','corrFactor_finite']].transpose().to_csv("%s/calib_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
-    df_geom[['triggercell','threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
-    with open("%s/registers_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),'w') as outFile:
-        outFile.write('isHDM\n')
-        outFile.write(f'{df_geom.isHDM.any()}\n')
+#    print(df_geom.head())
+#    df_geom.set_index(['wafer'])
+    for wafer in waferList:
+        if odir=='./':
+            waferDir = 'wafer_D%iL%iW%i/'%(subdet,layer,wafer) 
+        else:
+            waferDir = '%s/wafer_D%iL%iW%i/'%(odir,subdet,layer,wafer) 
+
+        df_geom[df_geom.wafer==wafer][['triggercell','corrFactor_finite']].transpose().to_csv("%s/calib_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),index=False,header=None)
+        df_geom[df_geom.wafer==wafer][['triggercell','threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),index=False,header=None)    
+        with open("%s/registers_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),'w') as outFile:
+            outFile.write('isHDM\n')
+            outFile.write(f'{df_geom.loc[wafer].isHDM.any()}\n')
 
     return
+
+# def writeInputCSV(odir,df,subdet,layer,wafer,appendFile=False):
+#     writeMode = 'w'
+#     header=True
+#     if appendFile:
+#         writeMode='a'
+#         header=False
+
+#     #output of switch matrix ( i.e. decoded charge)
+#     SM_headers = ["SM_%s"%i for i in range(0,48)]
+#     #output of Calibration ( i.e. calib charge)
+#     CALQ_headers = ["CALQ_%s"%i for i in range(0,48)]
+
+#     gb = df.groupby(['entry','subdet','layer','wafer'],group_keys=False)
+
+#     smlist   = gb[['triggercell','decodedCharge']].apply(makeTCindexCols,'decodedCharge',-1)
+#     calQlist = gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',-1)
+
+#     df_out     = pd.DataFrame(index=smlist.index)
+#     df_out[SM_headers]     = pd.DataFrame((smlist).values.tolist(),index=smlist.index)
+#     df_out[CALQ_headers]   = pd.DataFrame((calQlist).values.tolist(),index=calQlist.index)
+#     df_out.fillna(0,inplace=True)
+#     df_out.to_csv("%s/SM_output.csv"%odir  ,columns=SM_headers,index=False, mode=writeMode, header=header)
+#     df_out.to_csv("%s/CALQ_output.csv"%odir,columns=CALQ_headers,index=False, mode=writeMode, header=header)
+
+
+# def writeRegisters(odir,geomDF,subdet,layer,wafer):
+#     ## write subsidary files
+#     df_geom = geomDF.reset_index()
+#     df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & ( df_geom.wafer==wafer) & (df_geom.zside==1) ]
+#     df_geom = df_geom.reset_index(drop=True)
+#     precision  = 2**-11
+#     df_geom['corrFactor_finite']    = round(1./np.cosh(df_geom.eta) / precision) * precision
+#     df_geom[['triggercell','corrFactor_finite']].transpose().to_csv("%s/calib_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
+#     df_geom[['triggercell','threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
+#     with open("%s/registers_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),'w') as outFile:
+#         outFile.write('isHDM\n')
+#         outFile.write(f'{df_geom.isHDM.any()}\n')
+
+#     return
 
 def writeThresholdFormat(d_csv):
     df_wafer  = pd.read_csv(d_csv['wafer_csv'])
@@ -299,30 +367,25 @@ def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, appendFile=Fa
     waferList = Layer_df.wafer.unique()
     if not wafer==-1:
         waferList = [wafer]
-    print (waferList)
-    for _wafer in waferList:
-        if odir=='./':
-            waferDir = 'wafer_D%iL%iW%i/'%(subdet,layer,_wafer) 
-        else:
-            waferDir = '%s/wafer_D%iL%iW%i/'%(odir,subdet,layer,_wafer) 
-        if not os.path.exists(waferDir):
-            os.makedirs(waferDir, exist_ok=True)
+    print ('Writing Inputs')
 
-        customCharge_df = Layer_df[Layer_df.wafer==_wafer].set_index(['entry','subdet','layer','wafer'])
-        print (f'loaded wafer {_wafer}')
-        writeInputCSV( waferDir,  customCharge_df, subdet,layer,_wafer,appendFile)
-        if not appendFile:
-            writeRegisters( waferDir,  geomDF, subdet,layer,_wafer)
+    writeInputCSV(odir,  Layer_df, subdet,layer,waferList,appendFile)
+
+    if not appendFile:
+        print ('Writing Registers')
+        writeRegisters( odir,  geomDF, subdet,layer,waferList)
             
     return waferList
 
 def runAlgos(subdet, layer, waferList, odir):
+    print ('Starting Algos')
     for _wafer in waferList:
+        print (_wafer)
         if odir=='./':
             waferDir = 'wafer_D%iL%iW%i/'%(subdet,layer,_wafer) 
         else:
             waferDir = '%s/wafer_D%iL%iW%i/'%(odir,subdet,layer,_wafer) 
-
+#        print(waferDir)
         threshold_inputcsv ={
             'calQ_csv'         :waferDir+'CALQ_output.csv', #input
             'thres_csv'        :waferDir+'thres_D%iL%iW%i.csv'%(subdet,layer,_wafer), #input threshold
@@ -356,27 +419,45 @@ def main(opt,args):
     if not opt.skipInput:
         print('loading')
 
+        fileNameContent = opt.inputFile
+        eosDir = opt.eosDir
+
+        fileList = []
+        # get list of files                                                                                                                                     
+        cmd = "xrdfs root://cmseos.fnal.gov ls %s"%eosDir
+
+        dirContents,stderr = Popen(cmd,shell=True,stdout=PIPE,stderr=PIPE).communicate()
+        dirContentsList = dirContents.decode('ascii').split("\n")
+        for fName in dirContentsList:
+            if fileNameContent in fName:
+                fileList.append("root://cmseos.fnal.gov/%s"%(fName))
+
+        fileList = fileList[:opt.Nfiles]
+        
         geomDF = getGeomDF()
-        for i in [0,2]:
-            fName = f'root://cmseos.fnal.gov//store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar/ntuple_hgcalNtuples_ttbar_200PU_{i}.root'
+        for i,fName in enumerate(fileList):
             waferList = processNtupleInputs(fName, geomDF, opt.subdet, opt.layer, opt.wafer, opt.odir, appendFile=i>0)
     else:
         if not opt.wafer==-1:
             waferList = [opt.wafer]
         else:
-            df_geom = getGeomDF()
-            df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & (df_geom.zside==1) ]
+            df_geom = getGeomDF().reset_index()
+            df_geom = df_geom[(df_geom.subdet==opt.subdet) & (df_geom.layer==opt.layer) & (df_geom.zside==1) ]
 
             waferList = df_geom.wafer.unique()
+
     runAlgos(opt.subdet, opt.layer, waferList, opt.odir)
 
 if __name__=='__main__':
     parser = optparse.OptionParser()
-    parser.add_option('-i',"--inputFile", type="string", default = 'ntuple.root',dest="inputFile", help="input TSG ntuple")
+#    parser.add_option('-i',"--inputFile", type="string", default = 'ntuple.root',dest="inputFile", help="input TSG ntuple")
+    parser.add_option('-i',"--inputFile", type="string", default = 'ntuple_hgcalNtuples_ttbar_200PU',dest="inputFile", help="input TPG ntuple name format")
+    parser.add_option("--eosDir", type="string", default = '/store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar',dest="eosDir", help="direcotyr on eos to find TPG ntuples")
     parser.add_option('-o',"--odir", type="string", default = './',dest="odir", help="output directory")
     parser.add_option('-w',"--wafer" , type=int, default = -1,dest="wafer" , help="which wafer to write")
     parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
+    parser.add_option('-N', type=int, default = -1 ,dest="Nfiles", help="Limit on number of files to read (-1 is all)")
     parser.add_option("--skipInput", default = False, action='store_true',dest="skipInput", help="skip the read in step, only run algorithms on csv already there")
 
     (opt, args) = parser.parse_args()

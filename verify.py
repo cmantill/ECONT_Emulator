@@ -361,11 +361,10 @@ def writeThresholdFormat(d_csv):
 
 def writeBestChoice(d_csv):
     df_in = pd.read_csv(d_csv['calQ_csv'],index_col='entry')
-    print(df_in.head())
+
     df_sorted, _ = sort(df_in)
     df_sorted_index = pd.DataFrame(df_in.apply(batcher_sort, axis=1))
-    print (df_sorted.head())
-    print (df_sorted_index.head())
+
     df_sorted.columns = ['BC_Charge_{}'.format(i) for i in range(0, df_sorted.shape[1])]
 #    df_sorted.index.name = 'entry'
     df_sorted_index.columns = ['BC_Address_{}'.format(i) for i in range(0, df_sorted_index.shape[1])]

@@ -17,10 +17,10 @@ from format import formatThresholdOutput, formatThresholdTruncatedOutput, splitT
 encodeList = np.vectorize(encode)
 
 
-def processTree(_tree,geomDF, subdet,layer):
+def processTree(_tree,geomDF, subdet,layer,jobNumber=0,nEvents=-1):
     #load dataframe
     print('load dataframe')
-    df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystop=2)
+    df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystop=nEvents)
     df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt']
 
 
@@ -35,10 +35,14 @@ def processTree(_tree,geomDF, subdet,layer):
 
     #split +/- zside into separate entries
     df.reset_index(inplace=True)
-    maxN = df.entry.max()
-    df.set_index(['zside'],inplace=True)
+    negZ_eventOffset = 5000
+    jobNumber_eventOffset = 10000
 
-    df.loc[-1,['entry']] = df.loc[-1,['entry']] + maxN+1
+#    maxN = df.entry.max()
+    df.set_index(['zside'],inplace=True)
+    df['entry'] = df['entry'] + jobNumber_eventOffset*jobNumber
+    df.loc[-1,['entry']] = df.loc[-1,['entry']] + negZ_eventOffset
+
     df.reset_index(inplace=True)
     df.set_index(['entry','subdet','zside','layer','wafer','triggercell'],inplace=True)
 
@@ -155,7 +159,7 @@ def makeTCindexCols(group,col,iMOD=-1):
 ### the Threshold algo block from CSV inputs
 def writeThresAlgoBlock(d_csv):
 
-    df = pd.read_csv(d_csv['calQ_csv'])
+    df = pd.read_csv(d_csv['calQ_csv'],index_col='entry')
     df_thres = pd.read_csv(d_csv['thres_csv'],header=None)       ## CSV with 1 entry: decodedCharge thresholds of 48 triggercells
     
     df_passThres = pd.DataFrame(index = df.index,columns = df.columns)
@@ -190,9 +194,9 @@ def writeThresAlgoBlock(d_csv):
     ## output to CSV
     cols = np.array(df_out.columns.tolist())
     WAFER = np.logical_and(~np.in1d(cols,ADD_headers),~np.in1d(cols,CHARGEQ_headers))
-    df_out.to_csv(d_csv['thres_charge_csv' ],columns=CHARGEQ_headers,index=False)
-    df_out.to_csv(d_csv['thres_address_csv'],columns=ADD_headers,index=False)
-    df_out.to_csv(d_csv['thres_wafer_csv'  ],columns=WAFER,index=False)
+    df_out.to_csv(d_csv['thres_charge_csv' ],columns=CHARGEQ_headers,index='entry')
+    df_out.to_csv(d_csv['thres_address_csv'],columns=ADD_headers,index='entry')
+    df_out.to_csv(d_csv['thres_wafer_csv'  ],columns=WAFER,index='entry')
 
 
     return df_out
@@ -261,9 +265,9 @@ def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
         # df_out[SM_headers]     = pd.DataFrame((smlist.loc[subdet,layer,_wafer]).values.tolist(),index=smlist.loc[subdet,layer,_wafer].index)
         # df_out[CALQ_headers]   = pd.DataFrame((calQlist.loc[subdet,layer,_wafer]).values.tolist(),index=calQlist.loc[subdet,layer,_wafer].index)
         # df_out.fillna(0,inplace=True)
-        df_out.loc[_wafer].to_csv("%s/SM_output.csv"%waferDir  ,columns=SM_headers,index=False, mode=writeMode, header=header)
-        df_out.loc[_wafer].to_csv("%s/CALQ_output.csv"%waferDir,columns=CALQ_headers,index=False, mode=writeMode, header=header)
-        df_out.loc[_wafer].to_csv("%s/EPORTRX_output.csv"%waferDir,columns=EPORTRX_headers,index=False, mode=writeMode, header=header)
+        df_out.loc[_wafer].to_csv("%s/SM_output.csv"%waferDir  ,columns=SM_headers,index='entry', mode=writeMode, header=header)
+        df_out.loc[_wafer].to_csv("%s/CALQ_output.csv"%waferDir,columns=CALQ_headers,index='entry', mode=writeMode, header=header)
+        df_out.loc[_wafer].to_csv("%s/EPORTRX_output.csv"%waferDir,columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
 
 
 def writeRegisters(odir,geomDF,subdet,layer,waferList):
@@ -330,9 +334,9 @@ def writeRegisters(odir,geomDF,subdet,layer,waferList):
 #     return
 
 def writeThresholdFormat(d_csv):
-    df_wafer  = pd.read_csv(d_csv['wafer_csv'])
-    df_addmap = pd.read_csv(d_csv['add_csv'])
-    df_charge = pd.read_csv(d_csv['charge_csv'])
+    df_wafer  = pd.read_csv(d_csv['wafer_csv'],index_col='entry')
+    df_addmap = pd.read_csv(d_csv['add_csv'],index_col='entry')
+    df_charge = pd.read_csv(d_csv['charge_csv'],index_col='entry')
     
     df_wafer['CHARGEQ'] = df_charge.apply(list,axis=1)
     df_wafer['ADD_MAP'] = df_addmap.apply(list,axis=1)
@@ -352,37 +356,40 @@ def writeThresholdFormat(d_csv):
         df_wafer[cols] = pd.DataFrame(bit_str.values.tolist(), index=bit_str.index)
 
 #    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC'],index=False)
-    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC','WORDCOUNT']+cols,index=False)
+    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC','WORDCOUNT']+cols,index='entry')
     return
 
 def writeBestChoice(d_csv):
-    df_in = pd.read_csv(d_csv['calQ_csv'])
+    df_in = pd.read_csv(d_csv['calQ_csv'],index_col='entry')
+    print(df_in.head())
     df_sorted, _ = sort(df_in)
     df_sorted_index = pd.DataFrame(df_in.apply(batcher_sort, axis=1))
+    print (df_sorted.head())
+    print (df_sorted_index.head())
     df_sorted.columns = ['BC_Charge_{}'.format(i) for i in range(0, df_sorted.shape[1])]
-    df_sorted.index.name = 'BC'
+#    df_sorted.index.name = 'entry'
     df_sorted_index.columns = ['BC_Address_{}'.format(i) for i in range(0, df_sorted_index.shape[1])]
-    df_sorted_index.index.name = 'BC'
-    df_sorted.to_csv(d_csv['bc_charge_csv'],index=False)
-    df_sorted_index.to_csv(d_csv['bc_address_csv'],index=False)
+ #   df_sorted_index.index.name = 'entry'
+    df_sorted.to_csv(d_csv['bc_charge_csv'],index='entry')
+    df_sorted_index.to_csv(d_csv['bc_address_csv'],index='entry')
 
     df_registers = pd.read_csv(d_csv['register_csv'])
     isHDM = df_registers.isHDM.loc[0]
 
     df_sorted[df_sorted_index.columns] = df_sorted_index
-
+#    print (df_sorted.head())
     df_sorted['FRAMEQ'] = df_sorted.apply(formatBestChoiceOutput, args=(d_csv['nTC'],isHDM), axis=1)
     df_sorted['WORDCOUNT'] = (df_sorted.FRAMEQ.str.len()/16).astype(int)
     cols = [f'WORD_{i}' for i in range(25)]
     df_sorted[cols] = pd.DataFrame(df_sorted.apply(splitToWords,axis=1).tolist(),columns=cols)
 
-    df_sorted.to_csv(d_csv['bc_format_csv'],columns=['FRAMEQ','WORDCOUNT']+cols,index=False)
+    df_sorted.to_csv(d_csv['bc_format_csv'],columns=['FRAMEQ','WORDCOUNT']+cols,index='entry')
 
     return
 
 
 
-def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, appendFile=False):
+def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, appendFile=False):
 
     _tree = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['hgcalTriggerNtuplizer/HGCalTriggerNtuple']
 
@@ -391,8 +398,20 @@ def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, appendFile=Fa
     # writeMode='a' if appendFile else 'w'
     # print (writeMode)
 
+    numString = ''
+    for x in fName.split('.root')[0][::-1]:
+        if x.isdigit():
+            numString = x+numString
+        else:
+            break
+    jobNumber = 999
+    if numString.isdigit():
+        jobNumber = int(numString)
+        
+    print(f'file is job number {jobNumber}')
+
     print ('process tree')
-    Layer_df =   processTree(_tree,geomDF,subdet,layer)
+    Layer_df =   processTree(_tree,geomDF,subdet,layer,jobNumber,nEvents)
     waferList = Layer_df.wafer.unique()
     if not wafer==-1:
         waferList = [wafer]
@@ -465,7 +484,7 @@ def main(opt,args):
         
         geomDF = getGeomDF()
         for i,fName in enumerate(fileList):
-            waferList = processNtupleInputs(fName, geomDF, opt.subdet, opt.layer, opt.wafer, opt.odir, appendFile=i>0)
+            waferList = processNtupleInputs(fName, geomDF, opt.subdet, opt.layer, opt.wafer, opt.odir, opt.Nevents, appendFile=i>0)
     else:
         if not opt.wafer==-1:
             waferList = [opt.wafer]
@@ -487,6 +506,7 @@ if __name__=='__main__':
     parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
     parser.add_option('-N', type=int, default = -1 ,dest="Nfiles", help="Limit on number of files to read (-1 is all)")
+    parser.add_option('--Nevents', type=int, default = -1 ,dest="Nevents", help="Limit on number of events to read per file (-1 is all)")
     parser.add_option("--skipInput", default = False, action='store_true',dest="skipInput", help="skip the read in step, only run algorithms on csv already there")
 
     (opt, args) = parser.parse_args()

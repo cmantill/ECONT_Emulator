@@ -10,7 +10,7 @@ def sort(df):
     # FIXME: should find a way to apply the indices instead of sorting twice
     ar_sorted_index = np.array(np.argsort(-df, axis=1))
     ar_sorted = -np.sort(-df, axis=1)
-    return pd.DataFrame(ar_sorted), pd.DataFrame(ar_sorted_index)
+    return pd.DataFrame(ar_sorted, index=df.index), pd.DataFrame(ar_sorted_index)
 
 def sorter(ar, adr):
     N = int(ar.shape[0])

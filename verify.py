@@ -12,6 +12,7 @@ from bestchoice import batcher_sort,sort,sorter
 from linkAllocation import linksPerLayer, tcPerLink
 
 from subprocess import Popen,PIPE
+import gc
 
 from format import formatThresholdOutput, formatThresholdTruncatedOutput, splitToWords, formatBestChoiceOutput
 encodeList = np.vectorize(encode)
@@ -20,9 +21,11 @@ encodeList = np.vectorize(encode)
 def processTree(_tree,geomDF, subdet,layer,jobNumber=0,nEvents=-1):
     #load dataframe
     print('load dataframe')
+    if nEvents==-1:
+        nEvents=None
     df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystop=nEvents)
     df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt']
-
+    df.reset_index('subentry',drop=True,inplace=True)
 
     #remove unwanted layers
 #    df = df[(df.subdet==subdet) & (df.layer==layer) & ( df.wafer==wafer)  ]
@@ -30,7 +33,6 @@ def processTree(_tree,geomDF, subdet,layer,jobNumber=0,nEvents=-1):
 
     #set index
     df.set_index(['subdet','zside','layer','wafer','triggercell'],append=True,inplace=True)
-    df.reset_index('subentry',drop=True,inplace=True)
     df.sort_index(inplace=True)
 
     #split +/- zside into separate entries
@@ -85,6 +87,7 @@ def processTree(_tree,geomDF, subdet,layer,jobNumber=0,nEvents=-1):
     #threshold ADC is threshold in transverse charge
     df['pass_135'] = df.decodedCharge>(df.threshold_ADC/df.corrFactor)
 
+
     return df.reset_index()
 
 
@@ -127,11 +130,11 @@ def makeAddMAP(tclist):
 #     charges = np.array(list(qlist))     
 #     return np.pad(charges,(0,48-len(charges)),mode='constant',constant_values=0)
 
-def makeCHARGEQ(row):
+def makeCHARGEQ(row, nDropBit=1):
     nExp = 4
     nMant = 3
     roundBits = False
-    nDropBit = 1 ## TODO: make this configurable
+#    nDropBit = dropBits ## TODO: make this configurable
     asInt  = True
     
     raw_charges     = np.array(row.dropna()).astype(int)
@@ -184,10 +187,16 @@ def writeThresAlgoBlock(d_csv):
     df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 16-32 TC regardless of threshold
     df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 32-48 TC regardless of threshold
 
+
+    df_registers = pd.read_csv(d_csv['register_csv'])
+    isHDM = df_registers.isHDM.loc[0]
+
     ## boolean list of 48 TC cells (filled 0 in df_passThres first)
     tclist                   = df_passThres.fillna(0).apply(lambda x: np.array(x>0).astype(int),axis=1)
+
     ## calibCharge list of passing TC cells, padding zeros after list 
-    qlist                  = df_passThres.apply(makeCHARGEQ,axis=1)
+    nDrop = 3 if isHDM else 1
+    qlist                  = df_passThres.apply(makeCHARGEQ, nDropBit=nDrop,axis=1)
     df_out[CHARGEQ_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_headers)
     df_out[ADD_headers]     = pd.DataFrame(tclist.values.tolist(),index=tclist.index,columns=ADD_headers)
 
@@ -244,7 +253,6 @@ def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
     encodedlist   = gb[['triggercell','encodedCharge']].apply(makeTCindexCols,'encodedCharge',-1)
     smlist   = gb[['triggercell','decodedCharge']].apply(makeTCindexCols,'decodedCharge',-1)
     calQlist = gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',-1)
-
     df_out     = pd.DataFrame(index=smlist.index)
     df_out[ENCODED_headers]= pd.DataFrame((encodedlist).values.tolist(),index=encodedlist.index)
     df_out[SM_headers]     = pd.DataFrame((smlist).values.tolist(),index=smlist.index)
@@ -257,7 +265,7 @@ def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
         if odir=='./':
             waferDir = 'wafer_D%iL%iW%i/'%(subdet,layer,_wafer) 
         else:
-            waferDir = '%s/wafer_D%iL%iW%i/'%(odir,subdet,layer,_wafer) 
+            waferDir = '%s/wafer_D%iL%iW%i/'%(odir,subdet,layer,_wafer)
         if not os.path.exists(waferDir):
             os.makedirs(waferDir, exist_ok=True)
         
@@ -265,9 +273,22 @@ def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
         # df_out[SM_headers]     = pd.DataFrame((smlist.loc[subdet,layer,_wafer]).values.tolist(),index=smlist.loc[subdet,layer,_wafer].index)
         # df_out[CALQ_headers]   = pd.DataFrame((calQlist.loc[subdet,layer,_wafer]).values.tolist(),index=calQlist.loc[subdet,layer,_wafer].index)
         # df_out.fillna(0,inplace=True)
-        df_out.loc[_wafer].to_csv("%s/SM_output.csv"%waferDir  ,columns=SM_headers,index='entry', mode=writeMode, header=header)
-        df_out.loc[_wafer].to_csv("%s/CALQ_output.csv"%waferDir,columns=CALQ_headers,index='entry', mode=writeMode, header=header)
-        df_out.loc[_wafer].to_csv("%s/EPORTRX_output.csv"%waferDir,columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
+
+        waferInput = pd.DataFrame(index=df.entry.unique(),columns=SM_headers+CALQ_headers+EPORTRX_headers)
+        waferInput.index.name='entry'
+        waferInput[SM_headers+CALQ_headers+EPORTRX_headers] = df_out.loc[_wafer][SM_headers+CALQ_headers+EPORTRX_headers]
+        
+        waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna("0000000000000000000000000000")
+        waferInput.fillna(0,inplace=True)
+
+        waferInput = waferInput.astype({x:int for x in SM_headers+CALQ_headers})
+        
+        waferInput.to_csv("%s/SM_output.csv"%waferDir  ,columns=SM_headers,index='entry', mode=writeMode, header=header)
+        waferInput.to_csv("%s/CALQ_output.csv"%waferDir,columns=CALQ_headers,index='entry', mode=writeMode, header=header)
+        waferInput.to_csv("%s/EPORTRX_output.csv"%waferDir,columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
+        # df_out.loc[_wafer].to_csv("%s/SM_output.csv"%waferDir  ,columns=SM_headers,index='entry', mode=writeMode, header=header)
+        # df_out.loc[_wafer].to_csv("%s/CALQ_output.csv"%waferDir,columns=CALQ_headers,index='entry', mode=writeMode, header=header)
+        # df_out.loc[_wafer].to_csv("%s/EPORTRX_output.csv"%waferDir,columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
 
 
 def writeRegisters(odir,geomDF,subdet,layer,waferList):
@@ -342,19 +363,18 @@ def writeThresholdFormat(d_csv):
     df_wafer['ADD_MAP'] = df_addmap.apply(list,axis=1)
    
     debug = False
-    nDropbit = 1        ## TODO: make this configurable
 
     if not debug: 
         cols = [f'WORD_{i}' for i in range(25)]
         df_wafer['FRAMEQ'] = df_wafer.apply(formatThresholdOutput,args=(debug),axis=1)
         df_wafer['FRAMEQ_TRUNC'] = df_wafer.apply(formatThresholdTruncatedOutput,axis=1)
-        df_wafer[cols] = pd.DataFrame(df_wafer.apply(splitToWords,axis=1).tolist(),columns=cols)
+        df_wafer[cols] = pd.DataFrame(df_wafer.apply(splitToWords,axis=1).tolist(),columns=cols,index=df_wafer.index)
         df_wafer['WORDCOUNT'] = (df_wafer.FRAMEQ.str.len()/16).astype(int)
     else:
-        bit_str = df_wafer.apply(formatThresholdOutput,args=(nDropbit,debug),axis=1)
+        bit_str = df_wafer.apply(formatThresholdOutput,args=(debug),axis=1)
         cols          = ['header', 'dataType' , 'modSumData' ,'extraBit' ,'nChannelData' , 'AddressMapData' ,'ChargeData']
         df_wafer[cols] = pd.DataFrame(bit_str.values.tolist(), index=bit_str.index)
-
+    
 #    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC'],index=False)
     df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC','WORDCOUNT']+cols,index='entry')
     return
@@ -380,7 +400,7 @@ def writeBestChoice(d_csv):
     df_sorted['FRAMEQ'] = df_sorted.apply(formatBestChoiceOutput, args=(d_csv['nTC'],isHDM), axis=1)
     df_sorted['WORDCOUNT'] = (df_sorted.FRAMEQ.str.len()/16).astype(int)
     cols = [f'WORD_{i}' for i in range(25)]
-    df_sorted[cols] = pd.DataFrame(df_sorted.apply(splitToWords,axis=1).tolist(),columns=cols)
+    df_sorted[cols] = pd.DataFrame(df_sorted.apply(splitToWords,axis=1).tolist(),columns=cols,index=df_sorted.index)
 
     df_sorted.to_csv(d_csv['bc_format_csv'],columns=['FRAMEQ','WORDCOUNT']+cols,index='entry')
 
@@ -411,6 +431,9 @@ def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, appe
 
     print ('process tree')
     Layer_df =   processTree(_tree,geomDF,subdet,layer,jobNumber,nEvents)
+    del _tree
+    gc.collect()
+
     waferList = Layer_df.wafer.unique()
     if not wafer==-1:
         waferList = [wafer]
@@ -439,6 +462,7 @@ def runAlgos(subdet, layer, waferList, odir):
             'thres_charge_csv' :waferDir+'threshold_charge.csv',   #output
             'thres_address_csv':waferDir+'threshold_address.csv',  #output
             'thres_wafer_csv'  :waferDir+'threshold_wafer.csv',  #output
+            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
         }
         df_algo         =   writeThresAlgoBlock(threshold_inputcsv)
         bc_inputcsv ={
@@ -454,7 +478,8 @@ def runAlgos(subdet, layer, waferList, odir):
             'wafer_csv' :waferDir+'threshold_wafer.csv',        #input
             'add_csv'   :waferDir+'threshold_address.csv',      #input
             'charge_csv':waferDir+'threshold_charge.csv',       #input
-            'format_csv':waferDir+'threshold_formatblock.csv'   #output
+            'format_csv':waferDir+'threshold_formatblock.csv',  #output
+            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
         }
         writeThresholdFormat(format_inputcsv)
     

@@ -122,7 +122,7 @@ def formatBestChoiceOutput(row, nTC = 1, isHDM=True,debug=False):
         
     else:
         nChannelData=''
-        AddressMapData=''.join([str(i) for i in ADD_MAP])
+        AddressMapData=''.join([str(i) for i in BITMAP])
         ChargeData = ''
         for x in CHARGEQ:
             ChargeData += encode(x,nDropBit,nExp,nMant,roundBits)
@@ -142,6 +142,21 @@ def formatBestChoiceOutput(row, nTC = 1, isHDM=True,debug=False):
     else:
         return [header, modSumData , AddressMapData , ChargeData]
 
+
+def formatRepeaterOutput(row,debug=False):
+    cols = [f'RPT_{i}' for i in range(48)]
+    CHARGEQ = row[cols].values
+    ChargeData = ''
+    for x in CHARGEQ:
+        ChargeData += format(x, '#0%ib'%(9))[2:]
+
+    header = '00000'
+
+    formattedData = header + ChargeData
+    nPadBits = 16 - (len(formattedData)%16)
+    paddedData = formattedData + '0'*nPadBits
+
+    return paddedData
 
 
 def splitToWords(row, colName='FRAMEQ', N=16,totalWords=25):

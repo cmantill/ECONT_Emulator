@@ -28,8 +28,8 @@ def processTree(_tree,geomDF, subdet,layer,jobNumber=0,nEvents=-1):
     df.reset_index('subentry',drop=True,inplace=True)
 
     #remove unwanted layers
-#    df = df[(df.subdet==subdet) & (df.layer==layer) & ( df.wafer==wafer)  ]
-    df = df[(df.subdet==subdet) & (df.layer==layer)   ]
+#    df = df[(df.subdet==subdet) & (df.layer==layer) & ( df.wafer==wafer)]
+    df = df[(df.subdet==subdet) & (df.layer==layer)]
 
     #set index
     df.set_index(['subdet','zside','layer','wafer','triggercell'],append=True,inplace=True)
@@ -298,8 +298,7 @@ def writeRegisters(odir,geomDF,subdet,layer,waferList):
     df_geom = df_geom.reset_index(drop=True)
     precision  = 2**-11
     df_geom['corrFactor_finite']    = round(1./np.cosh(df_geom.eta) / precision) * precision
-#    print(df_geom.head())
-#    df_geom.set_index(['wafer'])
+
     for wafer in waferList:
         if odir=='./':
             waferDir = 'wafer_D%iL%iW%i/'%(subdet,layer,wafer) 
@@ -313,46 +312,6 @@ def writeRegisters(odir,geomDF,subdet,layer,waferList):
             outFile.write(f'{df_geom.loc[wafer].isHDM.any()}\n')
 
     return
-
-# def writeInputCSV(odir,df,subdet,layer,wafer,appendFile=False):
-#     writeMode = 'w'
-#     header=True
-#     if appendFile:
-#         writeMode='a'
-#         header=False
-
-#     #output of switch matrix ( i.e. decoded charge)
-#     SM_headers = ["SM_%s"%i for i in range(0,48)]
-#     #output of Calibration ( i.e. calib charge)
-#     CALQ_headers = ["CALQ_%s"%i for i in range(0,48)]
-
-#     gb = df.groupby(['entry','subdet','layer','wafer'],group_keys=False)
-
-#     smlist   = gb[['triggercell','decodedCharge']].apply(makeTCindexCols,'decodedCharge',-1)
-#     calQlist = gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',-1)
-
-#     df_out     = pd.DataFrame(index=smlist.index)
-#     df_out[SM_headers]     = pd.DataFrame((smlist).values.tolist(),index=smlist.index)
-#     df_out[CALQ_headers]   = pd.DataFrame((calQlist).values.tolist(),index=calQlist.index)
-#     df_out.fillna(0,inplace=True)
-#     df_out.to_csv("%s/SM_output.csv"%odir  ,columns=SM_headers,index=False, mode=writeMode, header=header)
-#     df_out.to_csv("%s/CALQ_output.csv"%odir,columns=CALQ_headers,index=False, mode=writeMode, header=header)
-
-
-# def writeRegisters(odir,geomDF,subdet,layer,wafer):
-#     ## write subsidary files
-#     df_geom = geomDF.reset_index()
-#     df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & ( df_geom.wafer==wafer) & (df_geom.zside==1) ]
-#     df_geom = df_geom.reset_index(drop=True)
-#     precision  = 2**-11
-#     df_geom['corrFactor_finite']    = round(1./np.cosh(df_geom.eta) / precision) * precision
-#     df_geom[['triggercell','corrFactor_finite']].transpose().to_csv("%s/calib_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
-#     df_geom[['triggercell','threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),index=False,header=None)
-#     with open("%s/registers_D%sL%sW%s.csv"%(odir,subdet,layer,wafer),'w') as outFile:
-#         outFile.write('isHDM\n')
-#         outFile.write(f'{df_geom.isHDM.any()}\n')
-
-#     return
 
 def writeThresholdFormat(d_csv):
     df_wafer  = pd.read_csv(d_csv['wafer_csv'],index_col='entry')
@@ -368,6 +327,7 @@ def writeThresholdFormat(d_csv):
         cols = [f'WORD_{i}' for i in range(25)]
         df_wafer['FRAMEQ'] = df_wafer.apply(formatThresholdOutput,args=(debug),axis=1)
         df_wafer['FRAMEQ_TRUNC'] = df_wafer.apply(formatThresholdTruncatedOutput,axis=1)
+
         df_wafer[cols] = pd.DataFrame(df_wafer.apply(splitToWords,axis=1).tolist(),columns=cols,index=df_wafer.index)
         df_wafer['WORDCOUNT'] = (df_wafer.FRAMEQ.str.len()/16).astype(int)
     else:
@@ -375,7 +335,6 @@ def writeThresholdFormat(d_csv):
         cols          = ['header', 'dataType' , 'modSumData' ,'extraBit' ,'nChannelData' , 'AddressMapData' ,'ChargeData']
         df_wafer[cols] = pd.DataFrame(bit_str.values.tolist(), index=bit_str.index)
     
-#    df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC'],index=False)
     df_wafer.to_csv(d_csv['format_csv'],columns=['FRAMEQ','FRAMEQ_TRUNC','WORDCOUNT']+cols,index='entry')
     return
 
@@ -386,9 +345,8 @@ def writeBestChoice(d_csv):
     df_sorted_index = pd.DataFrame(df_in.apply(batcher_sort, axis=1))
 
     df_sorted.columns = ['BC_Charge_{}'.format(i) for i in range(0, df_sorted.shape[1])]
-#    df_sorted.index.name = 'entry'
     df_sorted_index.columns = ['BC_Address_{}'.format(i) for i in range(0, df_sorted_index.shape[1])]
- #   df_sorted_index.index.name = 'entry'
+
     df_sorted.to_csv(d_csv['bc_charge_csv'],index='entry')
     df_sorted_index.to_csv(d_csv['bc_address_csv'],index='entry')
 
@@ -396,7 +354,6 @@ def writeBestChoice(d_csv):
     isHDM = df_registers.isHDM.loc[0]
 
     df_sorted[df_sorted_index.columns] = df_sorted_index
-#    print (df_sorted.head())
     df_sorted['FRAMEQ'] = df_sorted.apply(formatBestChoiceOutput, args=(d_csv['nTC'],isHDM), axis=1)
     df_sorted['WORDCOUNT'] = (df_sorted.FRAMEQ.str.len()/16).astype(int)
     cols = [f'WORD_{i}' for i in range(25)]
@@ -406,7 +363,21 @@ def writeBestChoice(d_csv):
 
     return
 
+def writeRepeaterAlgoBlock(d_csv):
+    df = pd.read_csv(d_csv['calQ_csv'],index_col='entry')
+    nDrop = 3 if isHDM else 1
+    qlist = df.apply(makeCHARGEQ, nDropBit=nDrop,axis=1)
+    RPT_headers = [f'RPT_{i}' for i in range(48)]
+    df[RPT_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index, columns = RPT_headers)
+    df.to_csv(d_csv['repeater_csv'], columns=RPT_headers, index='entry')
 
+    df['FRAMEQ'] = df.apply(formatRepeaterOutput, axis=1)
+    cols = [f'WORD_{i}' for i in range(25)]
+    df[cols] = pd.DataFrame(df.apply(splitToWords,axis=1).tolist(),columns=cols,index=df.index)
+
+    df.to_csv(d_csv['repeater_format_csv'],columns=['FRAMEQ']+cols,index='entry')
+
+    
 
 def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, appendFile=False):
 
@@ -482,7 +453,13 @@ def runAlgos(subdet, layer, waferList, odir):
             'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
         }
         writeThresholdFormat(format_inputcsv)
-    
+
+        repeater_inputcsv ={
+            'calQ_csv'         :waferDir+'CALQ_output.csv', #input
+            'repeater_csv' :waferDir+'repeater_charge.csv',   #output
+            'repeater_format_csv' :waferDir+'repeater_formatblock.csv',   #output
+        }
+        writeRepeaterAlgoBlock(repeater_inputcsv)
     
 
 def main(opt,args):
@@ -508,6 +485,7 @@ def main(opt,args):
         
         geomDF = getGeomDF()
         for i,fName in enumerate(fileList):
+            print(i, fName)
             waferList = processNtupleInputs(fName, geomDF, opt.subdet, opt.layer, opt.wafer, opt.odir, opt.Nevents, appendFile=i>0)
     else:
         if not opt.wafer==-1:
@@ -517,14 +495,14 @@ def main(opt,args):
             df_geom = df_geom[(df_geom.subdet==opt.subdet) & (df_geom.layer==opt.layer) & (df_geom.zside==1) ]
 
             waferList = df_geom.wafer.unique()
-
+    
     runAlgos(opt.subdet, opt.layer, waferList, opt.odir)
 
 if __name__=='__main__':
     parser = optparse.OptionParser()
-#    parser.add_option('-i',"--inputFile", type="string", default = 'ntuple.root',dest="inputFile", help="input TSG ntuple")
     parser.add_option('-i',"--inputFile", type="string", default = 'ntuple_hgcalNtuples_ttbar_200PU',dest="inputFile", help="input TPG ntuple name format")
-    parser.add_option("--eosDir", type="string", default = '/store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar',dest="eosDir", help="direcotyr on eos to find TPG ntuples")
+    parser.add_option("--eosDir", type="string", default = '/store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar',dest="eosDir", help="direcot")
+
     parser.add_option('-o',"--odir", type="string", default = './',dest="odir", help="output directory")
     parser.add_option('-w',"--wafer" , type=int, default = -1,dest="wafer" , help="which wafer to write")
     parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")

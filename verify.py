@@ -14,7 +14,10 @@ from linkAllocation import linksPerLayer, tcPerLink
 from subprocess import Popen,PIPE
 import gc
 
-from format import formatThresholdOutput, formatThresholdTruncatedOutput, splitToWords, formatBestChoiceOutput
+from format import formatThresholdOutput, formatThresholdTruncatedOutput, splitToWords, formatBestChoiceOutput, formatSTCOutput, formatRepeaterOutput
+
+from supertriggercell import supertriggercell
+
 encodeList = np.vectorize(encode)
 
 
@@ -309,7 +312,7 @@ def writeRegisters(odir,geomDF,subdet,layer,waferList):
         df_geom[df_geom.wafer==wafer][['triggercell','threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),index=False,header=None)    
         with open("%s/registers_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),'w') as outFile:
             outFile.write('isHDM\n')
-            outFile.write(f'{df_geom.loc[wafer].isHDM.any()}\n')
+            outFile.write(f'{df_geom[df_geom.wafer==wafer].isHDM.any()}\n')
 
     return
 
@@ -363,11 +366,43 @@ def writeBestChoice(d_csv):
 
     return
 
+def writeSTCAlgoBlock(d_csv):
+    df = pd.read_csv(d_csv['calQ_csv'],index_col='entry')
+
+    df_registers = pd.read_csv(d_csv['register_csv'])
+    isHDM = df_registers.isHDM.loc[0]
+
+    stcData = df.apply(supertriggercell,isHDM=isHDM,axis=1)
+
+    cols_STC_SUM = [f'STCSUM_{i}' for i in range(12)]
+    cols_STC_IDX = [f'STCIDX_{i}' for i in range(12)]
+    
+    df[cols_STC_SUM + cols_STC_IDX] = pd.DataFrame(stcData.tolist(),columns = cols_STC_SUM+cols_STC_IDX, index = df.index)
+
+    for c in cols_STC_SUM:
+        df[c] = encodeList(df[c],0,5,4,asInt=True)
+
+
+    df['FRAMEQ'] = df.apply(formatSTCOutput, isHDM=isHDM, axis=1)
+    cols_WORDS = [f'WORD_{i}' for i in range(10)]
+    df[cols_WORDS] = pd.DataFrame(df.apply(splitToWords, totalWords=10, axis=1).tolist(),columns=cols_WORDS,index=df.index)
+
+    df[cols_STC_SUM].to_csv(d_csv['stc_sum_csv'],columns=cols_STC_SUM,index='entry')
+    df[cols_STC_IDX].to_csv(d_csv['stc_idx_csv'],columns=cols_STC_IDX,index='entry')
+    df[['FRAMEQ']+cols_WORDS].to_csv(d_csv['stc_format_csv'],columns=['FRAMEQ']+cols_WORDS,index='entry')
+
+
+
 def writeRepeaterAlgoBlock(d_csv):
     df = pd.read_csv(d_csv['calQ_csv'],index_col='entry')
+
+    df_registers = pd.read_csv(d_csv['register_csv'])
+    isHDM = df_registers.isHDM.loc[0]
+
     nDrop = 3 if isHDM else 1
     qlist = df.apply(makeCHARGEQ, nDropBit=nDrop,axis=1)
     RPT_headers = [f'RPT_{i}' for i in range(48)]
+
     df[RPT_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index, columns = RPT_headers)
     df.to_csv(d_csv['repeater_csv'], columns=RPT_headers, index='entry')
 
@@ -454,10 +489,20 @@ def runAlgos(subdet, layer, waferList, odir):
         }
         writeThresholdFormat(format_inputcsv)
 
+        stc_inputcsv ={
+            'calQ_csv'         :waferDir+'CALQ_output.csv', #input
+            'stc_sum_csv' :waferDir+'stc_sum.csv',   #output
+            'stc_idx_csv' :waferDir+'stc_idx.csv',   #output
+            'stc_format_csv' :waferDir+'stc_formatblock.csv',   #output
+            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
+        }
+        writeSTCAlgoBlock(stc_inputcsv)
+    
         repeater_inputcsv ={
             'calQ_csv'         :waferDir+'CALQ_output.csv', #input
             'repeater_csv' :waferDir+'repeater_charge.csv',   #output
             'repeater_format_csv' :waferDir+'repeater_formatblock.csv',   #output
+            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
         }
         writeRepeaterAlgoBlock(repeater_inputcsv)
     

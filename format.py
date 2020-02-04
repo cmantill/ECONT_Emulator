@@ -143,6 +143,37 @@ def formatBestChoiceOutput(row, nTC = 1, isHDM=True,debug=False):
         return [header, modSumData , AddressMapData , ChargeData]
 
 
+def formatSTCOutput(row,isHDM=False,debug=False):
+    colsSUM=[f'STCSUM_{i}' for i in range(12)]
+    colsIDX=[f'STCIDX_{i}' for i in range(12)]
+
+    SumData = row[colsSUM].values
+    IdxData = row[colsIDX].values
+
+    nSTC = 12 if isHDM else 3
+
+    nBitsAdd = 2 if isHDM else 4
+
+    header = "00000"
+    STC_Data = ""
+    for i in range(nSTC):
+        dataBits = format(SumData[i], '#0%ib'%(9+2))[2:]
+        idxBits = format(IdxData[i], '#0%ib'%(nBitsAdd+2))[2:]
+        STC_Data += dataBits
+        STC_Data += idxBits
+
+    formattedData = header + STC_Data
+
+    if len(formattedData)%32==0:
+        nPadBits=0
+        paddedData = formattedData
+    else:
+        nPadBits = 32 - (len(formattedData)%32)
+        paddedData = formattedData + '0'*nPadBits
+
+    return paddedData
+
+
 def formatRepeaterOutput(row,debug=False):
     cols = [f'RPT_{i}' for i in range(48)]
     CHARGEQ = row[cols].values

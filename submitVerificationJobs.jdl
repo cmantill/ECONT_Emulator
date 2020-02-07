@@ -1,0 +1,26 @@
+universe = vanilla
+Executable = runVerificationCondor.sh
+
+should_transfer_files = YES
+WhenToTransferOutput  = ON_EXIT
+notification = never
+
+X=$(step)+1
+
+Transfer_Input_Files = verify.py, format.py, bestchoice.py, linkAllocation.py, encode.py, supertriggercell.py, TC_ELINK_MAP.csv
+
+Output = condor/verification_$(cluster)_$(process).stdout
+Error  = condor/verification_$(cluster)_$(process).stderr
+Log    = condor/verification_$(cluster)_$(process).condor
+
++RequestMemory=4000
+
+U=$(step)/10
+X=$INT(U)*2 + 1
+Y=$(step)%10 + 1
+Arguments = 3 $INT(X) $INT(Y) 10
+Queue 140
+X=$INT(U) + 29
+Y=$(step)%10 + 1
+Arguments = 4 $INT(X) $INT(Y) 10
+Queue 240

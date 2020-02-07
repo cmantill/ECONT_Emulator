@@ -2,6 +2,7 @@ import uproot
 import optparse
 import os
 
+import datetime
 import pandas as pd
 import numpy as np
 import time
@@ -190,18 +191,21 @@ def writeThresAlgoBlock(d_csv):
     df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 16-32 TC regardless of threshold
     df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 32-48 TC regardless of threshold
 
-
     df_registers = pd.read_csv(d_csv['register_csv'])
     isHDM = df_registers.isHDM.loc[0]
 
     ## boolean list of 48 TC cells (filled 0 in df_passThres first)
-    tclist                   = df_passThres.fillna(0).apply(lambda x: np.array(x>0).astype(int),axis=1)
+    # tclist                   = df_passThres.fillna(0).apply(lambda x: np.array(x>0).astype(int),axis=1)
+    add_df = df_passThres.notna().astype(int)
+    add_df.columns = ADD_headers
 
     ## calibCharge list of passing TC cells, padding zeros after list 
     nDrop = 3 if isHDM else 1
-    qlist                  = df_passThres.apply(makeCHARGEQ, nDropBit=nDrop,axis=1)
+
+    qlist = df_passThres.apply(makeCHARGEQ, nDropBit=nDrop,axis=1)
     df_out[CHARGEQ_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_headers)
-    df_out[ADD_headers]     = pd.DataFrame(tclist.values.tolist(),index=tclist.index,columns=ADD_headers)
+    # df_out[ADD_headers]     = pd.DataFrame(tclist.values.tolist(),index=tclist.index,columns=ADD_headers)
+    df_out[ADD_headers]     = add_df
 
     ## output to CSV
     cols = np.array(df_out.columns.tolist())
@@ -236,7 +240,7 @@ def packIntoInputLinks(row):
     return LINK
 
 
-def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
+def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False,jobInfo=""):
     writeMode = 'w'
     header=True
     if appendFile:
@@ -286,12 +290,9 @@ def writeInputCSV(odir,df,subdet,layer,waferList,appendFile=False):
 
         waferInput = waferInput.astype({x:int for x in SM_headers+CALQ_headers})
         
-        waferInput.to_csv("%s/SM_output.csv"%waferDir  ,columns=SM_headers,index='entry', mode=writeMode, header=header)
-        waferInput.to_csv("%s/CALQ_output.csv"%waferDir,columns=CALQ_headers,index='entry', mode=writeMode, header=header)
-        waferInput.to_csv("%s/EPORTRX_output.csv"%waferDir,columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
-        # df_out.loc[_wafer].to_csv("%s/SM_output.csv"%waferDir  ,columns=SM_headers,index='entry', mode=writeMode, header=header)
-        # df_out.loc[_wafer].to_csv("%s/CALQ_output.csv"%waferDir,columns=CALQ_headers,index='entry', mode=writeMode, header=header)
-        # df_out.loc[_wafer].to_csv("%s/EPORTRX_output.csv"%waferDir,columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
+        waferInput.to_csv(f"{waferDir}/SM_output{jobInfo}.csv"  ,columns=SM_headers,index='entry', mode=writeMode, header=header)
+        waferInput.to_csv(f"{waferDir}/CALQ_output{jobInfo}.csv",columns=CALQ_headers,index='entry', mode=writeMode, header=header)
+        waferInput.to_csv(f"{waferDir}/EPORTRX_output{jobInfo}.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
 
 
 def writeRegisters(odir,geomDF,subdet,layer,waferList):
@@ -414,7 +415,7 @@ def writeRepeaterAlgoBlock(d_csv):
 
     
 
-def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, appendFile=False):
+def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, appendFile=False, jobInfo=""):
 
     _tree = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['hgcalTriggerNtuplizer/HGCalTriggerNtuple']
 
@@ -445,7 +446,7 @@ def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, appe
         waferList = [wafer]
     print ('Writing Inputs')
 
-    writeInputCSV(odir,  Layer_df, subdet,layer,waferList,appendFile)
+    writeInputCSV(odir,  Layer_df, subdet,layer,waferList,appendFile, jobInfo)
 
     if not appendFile:
         print ('Writing Registers')
@@ -453,56 +454,58 @@ def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, appe
             
     return waferList
 
-def runAlgos(subdet, layer, waferList, odir):
+def runAlgos(subdet, layer, waferList, odir, jobInfo=""):
     print ('Starting Algos')
     for _wafer in waferList:
         print (_wafer)
+
         if odir=='./':
-            waferDir = 'wafer_D%iL%iW%i/'%(subdet,layer,_wafer) 
+            waferDir = f'wafer_D{subdet}L{layer}W{_wafer}/'
         else:
-            waferDir = '%s/wafer_D%iL%iW%i/'%(odir,subdet,layer,_wafer) 
-#        print(waferDir)
+            waferDir = '%s/wafer_D{subdet}L{layer}W{_wafer}'
+
         threshold_inputcsv ={
-            'calQ_csv'         :waferDir+'CALQ_output.csv', #input
-            'thres_csv'        :waferDir+'thres_D%iL%iW%i.csv'%(subdet,layer,_wafer), #input threshold
-            'thres_charge_csv' :waferDir+'threshold_charge.csv',   #output
-            'thres_address_csv':waferDir+'threshold_address.csv',  #output
-            'thres_wafer_csv'  :waferDir+'threshold_wafer.csv',  #output
-            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
+            'calQ_csv'         :f'{waferDir}/CALQ_output{jobInfo}.csv', #input
+            'thres_csv'        :f'{waferDir}/thres_D{subdet}L{layer}W{_wafer}.csv', #input threshold
+            'thres_charge_csv' :f'{waferDir}/threshold_charge{jobInfo}.csv',   #output
+            'thres_address_csv':f'{waferDir}/threshold_address{jobInfo}.csv',  #output
+            'thres_wafer_csv'  :f'{waferDir}/threshold_wafer{jobInfo}.csv',  #output
+            'register_csv'     :f'{waferDir}/registers_D{subdet}L{layer}W{_wafer}.csv'
         }
         df_algo         =   writeThresAlgoBlock(threshold_inputcsv)
-        bc_inputcsv ={
-            'calQ_csv'      :waferDir+'CALQ_output.csv', #input
-            'bc_charge_csv' :waferDir+'bc_charge.csv',   #output
-            'bc_address_csv':waferDir+'bc_address.csv',  #output
-            'bc_format_csv' :waferDir+'bc_formatblock.csv',  #output
-            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
-            'nTC': tcPerLink[linksPerLayer[layer]],
-        }
-        writeBestChoice(bc_inputcsv)
         format_inputcsv ={
-            'wafer_csv' :waferDir+'threshold_wafer.csv',        #input
-            'add_csv'   :waferDir+'threshold_address.csv',      #input
-            'charge_csv':waferDir+'threshold_charge.csv',       #input
-            'format_csv':waferDir+'threshold_formatblock.csv',  #output
-            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
+            'wafer_csv'    :f'{waferDir}/threshold_wafer{jobInfo}.csv',        #input
+            'add_csv'      :f'{waferDir}/threshold_address{jobInfo}.csv',      #input
+            'charge_csv'   :f'{waferDir}/threshold_charge{jobInfo}.csv',       #input
+            'format_csv'   :f'{waferDir}/threshold_formatblock{jobInfo}.csv',  #output
+            'register_csv' :f'{waferDir}/registers_D{subdet}L{layer}W{_wafer}.csv',
         }
         writeThresholdFormat(format_inputcsv)
 
+        bc_inputcsv ={
+            'calQ_csv'      :f'{waferDir}/CALQ_output{jobInfo}.csv', #input
+            'bc_charge_csv' :f'{waferDir}/bc_charge{jobInfo}.csv',   #output
+            'bc_address_csv':f'{waferDir}/bc_address{jobInfo}.csv',  #output
+            'bc_format_csv' :f'{waferDir}/bc_formatblock{jobInfo}.csv',  #output
+            'register_csv'  :f'{waferDir}/registers_D{subdet}L{layer}W{_wafer}.csv',
+            'nTC': tcPerLink[linksPerLayer[layer]],
+        }
+        writeBestChoice(bc_inputcsv)
+
         stc_inputcsv ={
-            'calQ_csv'         :waferDir+'CALQ_output.csv', #input
-            'stc_sum_csv' :waferDir+'stc_sum.csv',   #output
-            'stc_idx_csv' :waferDir+'stc_idx.csv',   #output
-            'stc_format_csv' :waferDir+'stc_formatblock.csv',   #output
-            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
+            'calQ_csv'       :f'{waferDir}/CALQ_output{jobInfo}.csv', #input
+            'stc_sum_csv'    :f'{waferDir}/stc_sum{jobInfo}.csv',   #output
+            'stc_idx_csv'    :f'{waferDir}/stc_idx{jobInfo}.csv',   #output
+            'stc_format_csv' :f'{waferDir}/stc_formatblock{jobInfo}.csv',   #output
+            'register_csv'   :f'{waferDir}/registers_D{subdet}L{layer}W{_wafer}.csv',
         }
         writeSTCAlgoBlock(stc_inputcsv)
     
         repeater_inputcsv ={
-            'calQ_csv'         :waferDir+'CALQ_output.csv', #input
-            'repeater_csv' :waferDir+'repeater_charge.csv',   #output
-            'repeater_format_csv' :waferDir+'repeater_formatblock.csv',   #output
-            'register_csv'  :waferDir+'registers_D%iL%iW%i.csv'%(subdet,layer,_wafer),
+            'calQ_csv'            :f'{waferDir}/CALQ_output{jobInfo}.csv', #input
+            'repeater_csv'        :f'{waferDir}/repeater_charge{jobInfo}.csv',   #output
+            'repeater_format_csv' :f'{waferDir}/repeater_formatblock{jobInfo}.csv',   #output
+            'register_csv'        :f'{waferDir}/registers_D{subdet}L{layer}W{_wafer}.csv',
         }
         writeRepeaterAlgoBlock(repeater_inputcsv)
     
@@ -512,6 +515,7 @@ def main(opt,args):
 
     if not opt.skipInput:
         print('loading')
+
 
         fileNameContent = opt.inputFile
         eosDir = opt.eosDir
@@ -526,12 +530,28 @@ def main(opt,args):
             if fileNameContent in fName:
                 fileList.append("root://cmseos.fnal.gov/%s"%(fName))
 
-        fileList = fileList[:opt.Nfiles]
-        
+                
+        startFileNum = 0
+        stopFileNum = -1
+        jobSplit = opt.jobSplit
+        jobSplitText = ""
+        if '/' in jobSplit:
+            if not jobSplit=="1/1":
+                jobSplitText = f"_{jobSplit.replace('/','of')}"
+                totalFiles = len(fileList)
+                jobNumber = int(jobSplit.split('/')[0])-1
+                nJobs = int(jobSplit.split('/')[1])
+                filesPerJob = 1.*totalFiles/nJobs
+                startFileNum = int(jobNumber*filesPerJob)
+                stopFileNum = int((jobNumber+1)*filesPerJob)
+        if not opt.Nfiles==-1:
+            stopFileNum = startFileNum + opt.Nfiles
+        fileList = fileList[startFileNum:stopFileNum]
+
         geomDF = getGeomDF()
         for i,fName in enumerate(fileList):
             print(i, fName)
-            waferList = processNtupleInputs(fName, geomDF, opt.subdet, opt.layer, opt.wafer, opt.odir, opt.Nevents, appendFile=i>0)
+            waferList = processNtupleInputs(fName, geomDF, opt.subdet, opt.layer, opt.wafer, opt.odir, opt.Nevents, appendFile=i>0, jobInfo=jobSplitText)
     else:
         if not opt.wafer==-1:
             waferList = [opt.wafer]
@@ -540,8 +560,8 @@ def main(opt,args):
             df_geom = df_geom[(df_geom.subdet==opt.subdet) & (df_geom.layer==opt.layer) & (df_geom.zside==1) ]
 
             waferList = df_geom.wafer.unique()
-    
-    runAlgos(opt.subdet, opt.layer, waferList, opt.odir)
+    if not opt.skipAlgo:
+        runAlgos(opt.subdet, opt.layer, waferList, opt.odir, jobInfo=jobSplitText)
 
 if __name__=='__main__':
     parser = optparse.OptionParser()
@@ -554,7 +574,9 @@ if __name__=='__main__':
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
     parser.add_option('-N', type=int, default = -1 ,dest="Nfiles", help="Limit on number of files to read (-1 is all)")
     parser.add_option('--Nevents', type=int, default = -1 ,dest="Nevents", help="Limit on number of events to read per file (-1 is all)")
+    parser.add_option('--jobSplit', type="string", default = 1/1 ,dest="jobSplit", help="Split of the input root files")
     parser.add_option("--skipInput", default = False, action='store_true',dest="skipInput", help="skip the read in step, only run algorithms on csv already there")
+    parser.add_option("--skipAlgo", default = False, action='store_true',dest="skipAlgo", help="skip the algorithm step, only create the input csv files")
 
     (opt, args) = parser.parse_args()
 

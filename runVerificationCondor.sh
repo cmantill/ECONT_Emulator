@@ -4,7 +4,7 @@
 subdet=$1
 layer=$2
 jobN=$3
-jobTot=$3
+jobTot=$4
 
 
 #If running on condor, checkout CMSSW and get extra libraries

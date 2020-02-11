@@ -75,7 +75,7 @@ def processTree(_tree,geomDF, subdet,layer,jobNumber=0,nEvents=-1):
     nMant = 3
     nDropHDM = 3
     nDropLDM = 1
-    roundBits = True
+    roundBits = False
    
     df['encodedCharge'] = np.where(df.isHDM,
                                    df.uncompressedCharge.apply(encode,args=(nDropHDM,nExp,nMant,roundBits,True)),
@@ -462,7 +462,7 @@ def runAlgos(subdet, layer, waferList, odir, jobInfo=""):
         if odir=='./':
             waferDir = f'wafer_D{subdet}L{layer}W{_wafer}/'
         else:
-            waferDir = '%s/wafer_D{subdet}L{layer}W{_wafer}'
+            waferDir = f'{odir}/wafer_D{subdet}L{layer}W{_wafer}'
 
         threshold_inputcsv ={
             'calQ_csv'         :f'{waferDir}/CALQ_output{jobInfo}.csv', #input

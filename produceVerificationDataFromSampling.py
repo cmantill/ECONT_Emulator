@@ -28,6 +28,7 @@ def sampleData(_subdetector = 3, _layer = 5, _wafer = 31, nBX=5000, samplingList
     Threshold_Format = pd.read_csv(f'{inputData}/threshold_formatblock.csv',index_col='entry',dtype=np.object)
     
     BC_Addresses = pd.read_csv(f'{inputData}/bc_address.csv',index_col='entry')
+    BC_Addresses.columns = [f'BC_TC_MAP_{i}' for i in range(48)]
     BC_Charge = pd.read_csv(f'{inputData}/bc_charge.csv',index_col='entry')
     BC_Format = pd.read_csv(f'{inputData}/bc_formatblock.csv',index_col='entry',dtype=np.object)
     

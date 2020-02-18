@@ -144,8 +144,13 @@ def formatBestChoiceOutput(row, nTC = 1, isHDM=True,debug=False):
 
 
 def formatSTCOutput(row,isHDM=False,debug=False):
-    colsSUM=[f'STCSUM_{i}' for i in range(12)]
-    colsIDX=[f'STCIDX_{i}' for i in range(12)]
+    if isHDM:
+        colsSUM=[f'STCSUM_{i}' for i in range(12)]
+        colsIDX=[f'STCIDX_{i}' for i in range(12)]
+    else:
+        colsSUM=[f'MOD_SUM_STC_{i}' for i in range(3)]
+        colsIDX=[f'MOD_SUM_STC_IDX_{i}' for i in range(3)]
+        
 
     SumData = row[colsSUM].values
     IdxData = row[colsIDX].values
@@ -190,7 +195,7 @@ def formatRepeaterOutput(row,debug=False):
     return paddedData
 
 
-def splitToWords(row, colName='FRAMEQ', N=16,totalWords=25):
+def splitToWords(row, colName='FRAMEQ', N=16,totalWords=28):
     fullData = row[colName]
     
     words = [fullData[i*N:(i+1)*N] for i in range(int(len(fullData)/N))]

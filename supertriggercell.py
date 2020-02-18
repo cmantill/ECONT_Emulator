@@ -19,9 +19,10 @@ stc4x4_Map = np.array([np.arange(0,16),
                        np.arange(32,48)])
 
 cols = [f'CALQ_{i}' for i in range(48)]
-def supertriggercell(row, isHDM=True):
 
-    stcMap = stc2x2_Map if isHDM else stc4x4_Map
+def supertriggercell_2x2(row):
+
+    stcMap = stc2x2_Map
 
     chargeQ = row[cols].values
     stc_Charges = chargeQ[stcMap]
@@ -29,9 +30,18 @@ def supertriggercell(row, isHDM=True):
     stc_sum=stc_Charges.sum(axis=1)
     stc_idx=stc_Charges.argmax(axis=1)
 
-    if not isHDM:
-        stc_sum = np.append(stc_sum,np.zeros(9,dtype=int))
-        stc_idx = np.append(stc_idx,np.zeros(9,dtype=int))
+    return np.append(stc_sum,stc_idx)
+
+
+def supertriggercell_4x4(row):
+
+    stcMap = stc4x4_Map
+
+    chargeQ = row[cols].values
+    stc_Charges = chargeQ[stcMap]
+
+    stc_sum=stc_Charges.sum(axis=1)
+    stc_idx=stc_Charges.argmax(axis=1)
 
     return np.append(stc_sum,stc_idx)
 

@@ -21,6 +21,7 @@ from supertriggercell import supertriggercell_2x2, supertriggercell_4x4
 
 encodeList = np.vectorize(encode)
 
+tc_remap = pd.read_csv("LDM_TC_Mapping.csv")[['TC_Number','ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']]
 
 def processTree(_tree, geomDF, subdet, layer, useV10=False, jobNumber=0, nEvents=-1):
     #load dataframe
@@ -44,8 +45,14 @@ def processTree(_tree, geomDF, subdet, layer, useV10=False, jobNumber=0, nEvents
         df['wafer'] = 100*df.waferu + df.waferv
 
         df['UV'] = list(zip(df.triggercellu, df.triggercellv))
-        df['triggercell'] = df.UV.map(triggerRemap)
+        df['triggercell'] = df.UV.map(triggerCellUVRemap)
 
+    print(df.head())
+    df = df.reset_index().merge(tc_remap,left_on='triggercell',right_on='TC_Number',how='left').set_index('entry')
+#    df = df.merge(tc_remap,left_on='triggercell',right_on='TC_Number',how='left',left_index=True,right_index=True)
+    df['triggercell'] = df.ECON_TC_Number_PostMux
+
+    print(df.head())
     #set index
     df.set_index(['subdet','zside','layer','wafer','triggercell'],append=True,inplace=True)
     df.sort_index(inplace=True)
@@ -136,54 +143,54 @@ def getGeomDF_V9():
     return geomDF
 
 
-triggerRemap = {(7,4):0,
-                (6,4):1,
-                (5,4):2,
-                (4,4):3,
-                (7,5):4,
-                (6,5):5,
-                (5,5):6,
-                (4,5):7,
-                (7,6):8,
-                (6,6):9,
-                (5,6):10,
-                (4,6):11,
-                (7,7):12,
-                (6,7):13,
-                (5,7):14,
-                (4,7):15,
-                (1,0):16,
-                (2,1):17,
-                (3,2):18,
-                (4,3):19,
-                (2,0):20,
-                (3,1):21,
-                (4,2):22,
-                (5,3):23,
-                (3,0):24,
-                (4,1):25,
-                (5,2):26,
-                (6,3):27,
-                (4,0):28,
-                (5,1):29,
-                (6,2):30,
-                (7,3):31,
-                (3,6):32,
-                (3,5):33,
-                (3,4):34,
-                (3,3):35,
-                (2,5):36,
-                (2,4):37,
-                (2,3):38,
-                (2,2):39,
-                (1,4):40,
-                (1,3):41,
-                (1,2):42,
-                (1,1):43,
-                (0,3):44,
-                (0,2):45,
-                (0,1):46,
-                (0,0):47,
+triggerCellUVRemap = {(7,4):0,
+                      (6,4):1,
+                      (5,4):2,
+                      (4,4):3,
+                      (7,5):4,
+                      (6,5):5,
+                      (5,5):6,
+                      (4,5):7,
+                      (7,6):8,
+                      (6,6):9,
+                      (5,6):10,
+                      (4,6):11,
+                      (7,7):12,
+                      (6,7):13,
+                      (5,7):14,
+                      (4,7):15,
+                      (1,0):16,
+                      (2,1):17,
+                      (3,2):18,
+                      (4,3):19,
+                      (2,0):20,
+                      (3,1):21,
+                      (4,2):22,
+                      (5,3):23,
+                      (3,0):24,
+                      (4,1):25,
+                      (5,2):26,
+                      (6,3):27,
+                      (4,0):28,
+                      (5,1):29,
+                      (6,2):30,
+                      (7,3):31,
+                      (3,6):32,
+                      (3,5):33,
+                      (3,4):34,
+                      (3,3):35,
+                      (2,5):36,
+                      (2,4):37,
+                      (2,3):38,
+                      (2,2):39,
+                      (1,4):40,
+                      (1,3):41,
+                      (1,2):42,
+                      (1,1):43,
+                      (0,3):44,
+                      (0,2):45,
+                      (0,1):46,
+                      (0,0):47,
 }
 
 def remapTriggerCellNumbers(x):
@@ -199,7 +206,7 @@ def getGeomDF_V10():
     geomDF = geomTree.pandas.df(['subdet','zside','layer','waferu','waferv','triggercellu','triggercellv','x','y','z','c_n'])
     geomDF['UV'] = list(zip(geomDF.triggercellu, geomDF.triggercellv))
 
-    geomDF['triggercell'] = geomDF.UV.map(triggerRemap)
+    geomDF['triggercell'] = geomDF.UV.map(triggerCellUVRemap)
     geomDF['wafer'] = 100*geomDF.waferu + geomDF.waferv
 
     geomDF['r'] = (geomDF['x']**2 + geomDF['y']**2)**.5
@@ -250,9 +257,9 @@ def makeCHARGEQ(row, nDropBit=1):
     return np.pad(encoded_charges,(0,48-len(encoded_charges)),mode='constant',constant_values=0)
     
 
-def makeTCindexCols(group,col,iMOD=-1):
+def makeTCindexCols(group,col,iMOD=-1,tc_ColName='triggercell'):
     charges=np.zeros(48, dtype=float)    #zeros
-    tclist = np.array(list(group['triggercell']))  #indexes of tc
+    tclist = np.array(list(group[tc_ColName]))  #indexes of tc
     qlist  = np.array(list(group[col]))            #cols for each tc
     charges[tclist] = qlist                       #assign charges in positions
     if iMOD==-1:
@@ -287,12 +294,10 @@ def writeThresAlgoBlock(d_csv):
     CHARGEQ_headers = ["CHARGEQ_%s"%i for i in range(0,48)]
 
     df_out['NTCQ'] = df_passThres.count(axis=1)         #df_passThres has NAN for TC below threshold
-    df_out['SUM']  = df.sum(axis=1).round().astype(np.int)                     #Sum over all charges regardless of threshold
-    df_out['MOD_SUM_0']  = df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1).round().astype(np.int)      #Sum over all charges of 0-16 TC regardless of threshold
-    df_out['MOD_SUM_1']  = df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 16-32 TC regardless of threshold
-    df_out['MOD_SUM_2']  = df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int)      #Sum over all charges of 32-48 TC regardless of threshold
-    
-
+    df_out['SUM']  = encodeList(df.sum(axis=1).round().astype(np.int),0,5,3,asInt=True)                     #Sum over all charges regardless of threshold
+    df_out['MOD_SUM_0']  = encodeList(df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1).round().astype(np.int),0,5,3,asInt=True)      #Sum over all charges of 0-16 TC regardless of threshold
+    df_out['MOD_SUM_1']  = encodeList(df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1).round().astype(np.int),0,5,3,asInt=True)      #Sum over all charges of 16-32 TC regardless of threshold
+    df_out['MOD_SUM_2']  = encodeList(df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int),0,5,3,asInt=True)      #Sum over all charges of 32-48 TC regardless of threshold
 
     df_registers = pd.read_csv(d_csv['register_csv'])
     isHDM = df_registers.isHDM.loc[0]
@@ -316,7 +321,6 @@ def writeThresAlgoBlock(d_csv):
     df_out.to_csv(d_csv['thres_charge_csv' ],columns=CHARGEQ_headers,index='entry')
     df_out.to_csv(d_csv['thres_address_csv'],columns=ADD_headers,index='entry')
     df_out.to_csv(d_csv['thres_wafer_csv'  ],columns=WAFER,index='entry')
-
 
     return df_out
 
@@ -360,7 +364,7 @@ def writeInputCSV(odir,df,subdet,layer,waferList,useV10,appendFile=False,jobInfo
     gb = df.groupby(['wafer','entry'],group_keys=False)
 #    gb = df.groupby(['subdet','layer','wafer','entry'],group_keys=False)
 
-    encodedlist   = gb[['triggercell','encodedCharge']].apply(makeTCindexCols,'encodedCharge',-1)
+    encodedlist   = gb[['ECON_TC_Number_PreMux','encodedCharge']].apply(makeTCindexCols,'encodedCharge',-1,'ECON_TC_Number_PreMux')
     smlist   = gb[['triggercell','decodedCharge']].apply(makeTCindexCols,'decodedCharge',-1)
     calQlist = gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',-1)
     df_out     = pd.DataFrame(index=smlist.index)
@@ -434,9 +438,14 @@ def writeRegisters(odir,geomDF,subdet,layer,waferList,useV10):
 
         df_geom[df_geom.wafer==wafer][['triggercell','corrFactor_finite']].transpose().to_csv("%s/calib_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),index=False,header=None)
         df_geom[df_geom.wafer==wafer][['triggercell','threshold_ADC']].transpose().to_csv("%s/thres_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),index=False,header=None)    
+
+        tc_remap[['ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']].set_index('ECON_TC_Number_PostMux').sort_index().transpose().to_csv("%s/mux_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),index=False,header=[f'MUX_{i}' for i in range(48)])    
+
         with open("%s/registers_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),'w') as outFile:
             outFile.write('isHDM\n')
             outFile.write(f'{df_geom[df_geom.wafer==wafer].isHDM.any()}\n')
+
+
 
     return
 

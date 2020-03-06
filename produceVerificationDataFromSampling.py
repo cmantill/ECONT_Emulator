@@ -90,13 +90,13 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     threshReg = pd.read_csv(f'{inputData}/thres_{wafer}.csv')
 
     threshReg = threshReg.loc[threshReg.index.repeat(nBX)]
-    threshReg.columns = [f'THRESV_{i}' for i in range(48)]
+    threshReg.columns = [f'THRESHV_{i}' for i in range(48)]
     threshReg.to_csv(f'{outputDir}/Algorithm_Input_Threshold.csv',index=False)
 
     calibReg = calibReg.loc[calibReg.index.repeat(nBX)]
     calibReg.columns = [f'CALV_{i}' for i in range(48)]
     calibReg = (calibReg*2**11).astype(int)
-    calibReg.to_csv(f'{outputDir}/Algorithm_Input_Calibration.csv',index=False)
+    calibReg.to_csv(f'{outputDir}/Calibration_Input_Calibration.csv',index=False)
 
     highDensity = Registers.loc[Registers.index.repeat(nBX)]
     highDensity.columns = ['HIGH_DENSITY']
@@ -116,18 +116,19 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     np.savetxt(f'{outputDir}/Algorithm_Input_Header.csv', headerValues,fmt='%d', header='HEADER',comments="")
     np.savetxt(f'{outputDir}/Algorithm_Output_Header.csv', headerValues,fmt='%d', header='HEADER',comments="")
 
-    InputEPORTRX.astype(int).loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Input_ePortRX.csv',index=False)
-    InputSM.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Input_SM.csv',index=False)
+    InputEPORTRX.astype(int).loc[SamplingOrder].to_csv(f'{outputDir}/Mux_Input_ePortRX.csv',index=False)
+    InputSM.loc[SamplingOrder].to_csv(f'{outputDir}/Mux_Output_SM.csv',index=False)
     InputCALQ.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Input_CalQ.csv',index=False)
 
     Threshold_AddMap.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_AddrMap.csv',index=False)
     Threshold_Charge.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_ChargeQ.csv',index=False)
     Threshold_Wafer.loc[SamplingOrder,["NTCQ"]].to_csv(f'{outputDir}/Algorithm_Output_NTCQ.csv',index=False)
     Threshold_Wafer.loc[SamplingOrder,["SUM"]].to_csv(f'{outputDir}/Algorithm_Output_Sum.csv',index=False)
-    Threshold_Wafer.loc[SamplingOrder,["MOD_SUM_0","MOD_SUM_1","MOD_SUM_2"]].to_csv(f'{outputDir}/Algorithm_Output_Mod_Sum.csv',index=False)
+    Threshold_Wafer['MOD_SUM'] = shiftBits(Threshold_Wafer.MOD_SUM_0,0) + shiftBits(Threshold_Wafer.MOD_SUM_1,8) + shiftBits(Threshold_Wafer.MOD_SUM_2,16)
+    Threshold_Wafer.loc[SamplingOrder,["MOD_SUM"]].to_csv(f'{outputDir}/Algorithm_Output_Mod_Sum.csv',index=False)
 
     BC_Addresses.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_BC_TC_map.csv',index=False)
-    BC_Charge.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_BC_Charge.csv',index=False)
+    BC_Charge.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_BC_Charge.csv',index=False,header=[f'BC_CHARGE_{i}' for i in range(48)])
 
     Cols_STC_2x2_Sum = [f'STC_2x2_SUM_{i}' for i in range(12)]
     Cols_STC_2x2_Idx = [f'STC_2x2_IDX_{i}' for i in range(12)]
@@ -175,6 +176,17 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     sampledSTCFormat['NULLVAL'] = shiftBits(headerValues)
     sampledRPTFormat['NULLVAL'] = shiftBits(headerValues)
 
+    # print(sampledThresholdFormat[cols].head())
+    # print(sampledThresholdFormat[cols].notna().sum(axis=1))
+    # print(sampledThresholdFormat[cols].iloc[0].values)
+
+    sampledThresholdFormat['wordCount'] = sampledThresholdFormat[cols].notna().sum(axis=1)
+    sampledRPTFormat['wordCount'] = sampledRPTFormat[cols].notna().sum(axis=1)
+    sampledSTCFormat['wordCount'] = sampledSTCFormat[cols].notna().sum(axis=1)
+    sampledBCFormat['wordCount'] = sampledBCFormat[cols].notna().sum(axis=1)
+
+    sampledThresholdFormat['FRAMEQ_TRUNC'] = sampledThresholdFormat['FRAMEQ_TRUNC'].apply(int,args=(2,))
+
     for c in cols:
         sampledThresholdFormat.loc[sampledThresholdFormat[c].notna(),c] = sampledThresholdFormat.loc[sampledThresholdFormat[c].notna(),c].apply(int,args=(2,))
         sampledThresholdFormat.loc[sampledThresholdFormat[c].isna(),c] = sampledThresholdFormat.loc[sampledThresholdFormat[c].isna(),'NULLVAL']        
@@ -188,12 +200,26 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
         sampledRPTFormat.loc[sampledRPTFormat[c].notna(),c] = sampledRPTFormat.loc[sampledRPTFormat[c].notna(),c].apply(int,args=(2,))
         sampledRPTFormat.loc[sampledRPTFormat[c].isna(),c] = sampledRPTFormat.loc[sampledRPTFormat[c].isna(),'NULLVAL']        
 
-    sampledThresholdFormat[cols+['FRAMEQ_TRUNC']].to_csv(f'{outputDir}/Algorithm_Output_Format.csv',index=False)
-    sampledBCFormat[cols].to_csv(f'{outputDir}/Algorithm_Output_BC_Format.csv',index=False)
-    sampledSTCFormat[cols[:10]].to_csv(f'{outputDir}/Algorithm_Output_STC_Format.csv',index=False)
-    sampledRPTFormat[cols].to_csv(f'{outputDir}/Algorithm_Output_RPT_Format.csv',index=False)
+    sampledThresholdFormat[cols+['FRAMEQ_TRUNC','wordCount']].to_csv(f'{outputDir}/Formatter_Output_ThresholdSum.csv',index=False)
+    sampledBCFormat[cols + ['wordCount']].to_csv(f'{outputDir}/Formatter_Output_BC.csv',index=False)
+    sampledSTCFormat[cols + ['wordCount']].to_csv(f'{outputDir}/Formatter_Output_STC.csv',index=False)
+    sampledRPTFormat[cols + ['wordCount']].to_csv(f'{outputDir}/Formatter_Output_RPT.csv',index=False)
 
-    return
+    return outputDir
+
+
+import glob
+def alterCSVFiles(outputDir):
+    csvFiles = glob.glob(f'{outputDir}/*csv')
+
+    for fName in csvFiles:
+        with open(fName, "r") as sources:
+            lines = sources.readlines()
+        with open(fName, "w") as sources:
+            for line in lines:
+                sources.write(line.replace(',',', '))
+
+
 
 
 if __name__=='__main__':
@@ -203,9 +229,29 @@ if __name__=='__main__':
     parser.add_option('-N',"--nBX", type=int, default = None,dest="nBX", help="number of BX to simulate")
     parser.add_option('--samplingList', '--sampleList', type="string", default = None,dest="samplingList", help="file containing the list of BX to sample")
     parser.add_option('--extra', '--extraText', type="string", default = None,dest="extraText", help="extra text ot append to directory name (ex: version number, other notes to track)")
-    
+    parser.add_option('--CSVNoSpace',dest='replaceCSVDelim', action='store_false', default=True, help='keep the output csv files as comma delimited with no trailing space')
     (opt, args) = parser.parse_args()
 
-    sampleData(directoryName = opt.inputDir, outputName = opt.outputName, nBX = opt.nBX, samplingList = opt.samplingList, extraName=opt.extraText)
+    outputDir = sampleData(directoryName = opt.inputDir, outputName = opt.outputName, nBX = opt.nBX, samplingList = opt.samplingList, extraName=opt.extraText)
 
-#    sampleData(_subdetector = 3, _layer = 5, _wafer = 31, nBX=5000, samplingList=None, directoryName="ttbarData_subdet_EE_layer_5", outputName=opt.outputName)
+    alterCSVFiles(outputDir)
+
+
+    linkFiles = [["Formatter_Buffer_Input_Type_BC.csv",              "Algorithm_Input_Type_BC.csv"],                  
+                 ["Formatter_Buffer_Input_Type_RPT.csv",             "Algorithm_Input_Type_RPT.csv"],                  
+                 ["Formatter_Buffer_Input_Type_STC.csv",             "Algorithm_Input_Type_STC.csv"],                  
+                 ["Formatter_Buffer_Input_Type_TS.csv",              "Algorithm_Input_Type_TS.csv"],                  
+                 ["Formatter_Buffer_Input_ChargeQ.csv",              "Algorithm_Output_ChargeQ.csv"],              
+                 ["Formatter_Buffer_Input_AddrMap.csv",              "Algorithm_Output_AddrMap.csv"],              
+                 ["Formatter_Buffer_Input_NTCQ.csv",                 "Algorithm_Output_NTCQ.csv"],                 
+                 ["Formatter_Buffer_Input_Mod_Sum.csv",              "Algorithm_Output_Mod_Sum.csv"],              
+                 ["Formatter_Buffer_Input_Sum.csv",                  "Algorithm_Output_Sum.csv"],                  
+                 ["Formatter_Buffer_Inputr_STC_2x2_Sum.csv",         "Algorithm_Output_STC_2x2_Sum.csv"],         
+                 ["Formatter_Buffer_Input_Mod_Sum_stc.csv",          "Algorithm_Output_Mod_Sum_stc.csv"],          
+                 ["Formatter_Buffer_Input_BC_Charge.csv",            "Algorithm_Output_BC_Charge.csv"],            
+                 ["Formatter_Buffer_Input_BC_TC_map.csv",            "Algorithm_Output_BC_TC_map.csv"],            
+                 ["Formatter_Buffer_Input_RepeaterQ.csv",            "Algorithm_Output_RepeaterQ.csv"]]            
+
+    for f1, f2 in linkFiles:
+        os.symlink(f'{f2}',f'{outputDir}/{f1}')
+        

@@ -41,12 +41,19 @@ def encode(value, dropBits=1, expBits=4, mantBits=3, roundBits=False, asInt=Fals
     else:
         return exponent + mantissa
         
+def decode(val,droppedBits=1,expBits=4,mantBits=3,edge=False,quarter=False):
 
-def decode(val,droppedBits=1,expBits=4,mantBits=3):
-    if(type(val)==type(0)):
-        val=format(val, '#0%ib'%(expBits+mantBits+2))[2:]
-    exp = val[:expBits]
-    mant = val[expBits:]
-    shift = int(exp,2)
-    data = ((int(mant,2)<<(shift-1) if shift>0 else int(mant,2)) + (0 if shift==0 else (1<<(shift+mantBits-1))))<<droppedBits
+    exp=val>>mantBits
+    mant= val & (2**mantBits-1)
+
+    data = (((mant<<(exp-1)) if exp>0 else mant) + (0 if exp==0 else (1<<(exp+mantBits-1))))
+    data = data<<droppedBits
+
+    shift = max(exp-1,0)
+    if quarter:
+        if (droppedBits+shift)>1:
+            data += 1<<(shift+droppedBits-2)
+    elif not edge:
+        if (droppedBits+shift)>0:
+            data += 1<<(shift+droppedBits-1)
     return data

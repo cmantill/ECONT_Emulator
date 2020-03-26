@@ -84,12 +84,12 @@ def formatBestChoiceOutput(row, nTC = 1, isHDM=True,debug=False):
     nExp = 4
     nMant = 3
     roundBits = False
-    nDropBit = 3 if isHDM else 1
+    nDropBit = 0 #bits are dropped before algorithm in BC
 
     ADD_MAP = list(row[[f'BC_Address_{i}' for i in range(48)]])
     CHARGEQ = list(row[[f'BC_Charge_{i}' for i in range(48)]])
 
-    SUM =sum(CHARGEQ)
+    SUM =row['SUM']
 
     sel_q = CHARGEQ[:nTC]
     sel_add = ADD_MAP[:nTC]
@@ -104,7 +104,7 @@ def formatBestChoiceOutput(row, nTC = 1, isHDM=True,debug=False):
 
     #header = format(BC, '#0%ib'%(15))[-5:]
     header =  '00000'           ## don't assign BC for now    
-    modSumData = encode(SUM,0,5,3)
+    modSumData = format(SUM, '#010b')[2:]
 
     if nTC<8:
         nChannelData=format(nTC, '#0%ib'%(3+2))[2:]

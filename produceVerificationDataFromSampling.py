@@ -20,11 +20,20 @@ shiftBits= np.vectorize(shiftBits)
 def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingList=None, extraName=None):
 
     waferInfo = re.search('\w+_D(\d+)L(\d+)W(\d+)',directoryName)
+    if waferInfo is None:
+        waferInfo = re.search('\w+_D(\d+)L(\d+)U(\d+)V(\d+)',directoryName)
+        
 
     if not waferInfo is None:
         _subdetector = int(waferInfo.groups()[0])
         _layer = int(waferInfo.groups()[1])
-        _wafer = int(waferInfo.groups()[2])
+        if len(waferInfo.groups())==3:
+            _wafer = int(waferInfo.groups()[2])
+        else:
+            _waferU = int(waferInfo.groups()[2])
+            _waferV = int(waferInfo.groups()[3])
+#            wafer = f'D{_subdetector}L{_layer}U{_waferU}V{_waferV}'
+            _wafer=100*_waferU+_waferV
     else:
         _subdetector = 0
         _layer=0
@@ -32,7 +41,6 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
 
 
     wafer = f'D{_subdetector}L{_layer}W{_wafer}'
-
     inputData = directoryName
 
     InputEPORTRX = pd.read_csv(f'{inputData}/EPORTRX_output.csv',index_col='entry')
@@ -98,9 +106,10 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     calibReg = (calibReg*2**11).astype(int)
     calibReg.to_csv(f'{outputDir}/Calibration_Input_Calibration.csv',index=False)
 
-    highDensity = Registers.loc[Registers.index.repeat(nBX)]
-    highDensity.columns = ['HIGH_DENSITY']
-    highDensity.astype(int).to_csv(f'{outputDir}/Algorithm_Input_HighDensity.csv',index=False)
+    registers = Registers.loc[Registers.index.repeat(nBX)]
+    registers.columns = ['HIGH_DENSITY','DROPPED_BITS']
+    registers[['HIGH_DENSITY']].astype(int).to_csv(f'{outputDir}/Algorithm_Input_HighDensity.csv',index=False)
+    registers[['DROPPED_BITS']].astype(int).to_csv(f'{outputDir}/Algorithm_Input_DroppedBits.csv',index=False)
 
     type_TS = pd.DataFrame({'TYPE':[0]*nBX})
     type_TS.to_csv(f'{outputDir}/Algorithm_Input_Type_TS.csv',index=False)
@@ -143,11 +152,23 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     STC_Idx.loc[SamplingOrder,Cols_STC_2x2_Idx].to_csv(f'{outputDir}/Algorithm_Output_STC_Idx.csv',index=False)
     
 
-    STC_Sum['MOD_SUM_STC'] = shiftBits(STC_Sum.MOD_SUM_STC_0,0) + shiftBits(STC_Sum.MOD_SUM_STC_1,9) + shiftBits(STC_Sum.MOD_SUM_STC_2,18)
+    STC_Sum['MOD_SUM_STC'] = shiftBits(STC_Sum.MOD_SUM_STC_0,0) + shiftBits(STC_Sum.MOD_SUM_STC_1,8) + shiftBits(STC_Sum.MOD_SUM_STC_2,16)
     STC_Sum.loc[SamplingOrder,['MOD_SUM_STC']].to_csv(f'{outputDir}/Algorithm_Output_Mod_Sum_stc.csv',index=False)
     STC_Idx.loc[SamplingOrder,Cols_Mod_Sum_Idx].to_csv(f'{outputDir}/Algorithm_Output_Mod_Sum_Idx_stc.csv',index=False)
 
     RPT_Chg.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_RepeaterQ.csv',index=False)
+
+
+
+    sampledEPORTRXInput = InputEPORTRX.loc[SamplingOrder]
+    for c in sampledEPORTRXInput.columns:
+        sampledEPORTRXInput[c] = sampledEPORTRXInput[c] + (headerValues<<24)
+
+    
+    sampledEPORTRXInput['godOrbitNumber'] = (np.arange(len(SamplingOrder))/3564).astype(int)
+    sampledEPORTRXInput['godBucketNumber'] = np.arange(len(SamplingOrder))%3564
+    sampledEPORTRXInput.set_index(['godOrbitNumber','godBucketNumber'],inplace=True)
+    sampledEPORTRXInput.to_csv(f'{outputDir}/EPORTRX_Input.csv',index=True)
 
     head = toBin(headerValues)
 
@@ -169,12 +190,15 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     sampledRPTFormat['FRAMEQ'] = replaceHeader(sampledRPTFormat.FRAMEQ,head)
     sampledRPTFormat['WORD_0'] = replaceHeader(sampledRPTFormat.WORD_0,head)
 
+
     cols =[f'WORD_{i}' for i in range(28)]
 
-    sampledThresholdFormat['NULLVAL'] = shiftBits(headerValues)
-    sampledBCFormat['NULLVAL'] = shiftBits(headerValues)
-    sampledSTCFormat['NULLVAL'] = shiftBits(headerValues)
-    sampledRPTFormat['NULLVAL'] = shiftBits(headerValues)
+    TX_SYNC_WORD='00000000000'
+
+    sampledThresholdFormat['NULLVAL'] = shiftBits(headerValues) + int(TX_SYNC_WORD)
+    sampledBCFormat['NULLVAL'] = shiftBits(headerValues) + int(TX_SYNC_WORD)
+    sampledSTCFormat['NULLVAL'] = shiftBits(headerValues) + int(TX_SYNC_WORD)
+    sampledRPTFormat['NULLVAL'] = shiftBits(headerValues) + int(TX_SYNC_WORD)
 
     # print(sampledThresholdFormat[cols].head())
     # print(sampledThresholdFormat[cols].notna().sum(axis=1))
@@ -204,6 +228,9 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     sampledBCFormat[cols + ['wordCount']].to_csv(f'{outputDir}/Formatter_Output_BC.csv',index=False)
     sampledSTCFormat[cols + ['wordCount']].to_csv(f'{outputDir}/Formatter_Output_STC.csv',index=False)
     sampledRPTFormat[cols + ['wordCount']].to_csv(f'{outputDir}/Formatter_Output_RPT.csv',index=False)
+
+    sampledThresholdFormat['TX_SYNC_WORD'] = int(TX_SYNC_WORD)
+    sampledThresholdFormat[['TX_SYNC_WORD']].to_csv(f'{outputDir}/Formatter_Buffer_Input_Tx_Sync_Word.csv',index=False)
 
     return outputDir
 
@@ -253,5 +280,6 @@ if __name__=='__main__':
                  ["Formatter_Buffer_Input_RepeaterQ.csv",            "Algorithm_Output_RepeaterQ.csv"]]            
 
     for f1, f2 in linkFiles:
-        os.symlink(f'{f2}',f'{outputDir}/{f1}')
+        if not os.path.exists(f'{outputDir}/{f1}'):
+            os.symlink(f'{f2}',f'{outputDir}/{f1}')
         

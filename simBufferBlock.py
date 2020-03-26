@@ -88,7 +88,7 @@ def getBufferOutputs(df, nOutputLinks, outputDir, algoType = "ThresholdSum", nBi
     return
 
 
-def thresholdSumBuffer(directory):
+def simBuffer(directory):
     inputFileName = f'{directory}/Formatter_Output_ThresholdSum.csv'
     dfTS = pd.read_csv(inputFileName,dtype=int,skipinitialspace=True)
 
@@ -122,10 +122,8 @@ def thresholdSumBuffer(directory):
         _file.write('BUFFER_THRESHOLD_T3\n')
         _file.write(f'{T3_Words}\n')
 
-    with open(f'{directory}/Buffers/OverflowControls.csv','w') as _file:
-        _file.write('T1, T2, T3\n')
-        _file.write(f'{T1_Words},{T2_Words},{T3_Words}\n')
- 
+
+
     if opt.NLinks==-1:
         linkRange = range(1,15)
     else:
@@ -136,17 +134,21 @@ def thresholdSumBuffer(directory):
     
         getBufferOutputs(dfTS, nOutputLinks=nLinks, outputDir=directory, algoType='ThresholdSum', nBitsPerLink=32, T1_Latency=T1_Words/2 , T2_Latency = T2_Words/2, T3=T3_Words)
 
-        getBufferOutputs(dfBC, nOutputLinks=nLinks, outputDir=directory, algoType='BC', nBitsPerLink=32)
+    nLinks_BC = int((int(dfBC['wordCount'].mean())+1)/2)
+    getBufferOutputs(dfBC, nOutputLinks=nLinks, outputDir=directory, algoType='BC', nBitsPerLink=32)
 
-        getBufferOutputs(dfSTC, nOutputLinks=nLinks, outputDir=directory, algoType='STC', nBitsPerLink=32)
-        getBufferOutputs(dfRPT, nOutputLinks=nLinks, outputDir=directory, algoType='RPT', nBitsPerLink=32)
+    nLinks_STC = int((int(dfSTC['wordCount'].mean())+1)/2)
+    getBufferOutputs(dfSTC, nOutputLinks=nLinks, outputDir=directory, algoType='STC', nBitsPerLink=32)
 
+    nLinks_RPT = 14
+    getBufferOutputs(dfRPT, nOutputLinks=nLinks, outputDir=directory, algoType='RPT', nBitsPerLink=32)
 
+    
 
 def main(opt, args):
     directory = opt.dir
 
-    thresholdSumBuffer(directory)
+    simBuffer(directory)
 
     if opt.replaceCSVDelim:
         alterCSVFiles(f'{directory}/Buffer')

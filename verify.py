@@ -23,6 +23,9 @@ encodeList = np.vectorize(encode)
 
 tc_remap = pd.read_csv("LDM_TC_Mapping.csv")[['TC_Number','ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']]
 
+def droppedBits(isHDM):
+    return 4 if isHDM else 2
+
 def processTree(_tree, geomDF, subdet, layer, useV10=False, jobNumber=0, nEvents=-1):
     #load dataframe
     print('load dataframe')
@@ -246,7 +249,7 @@ def makeCHARGEQ(row, nDropBit=1):
     nExp = 4
     nMant = 3
     roundBits = False
-#    nDropBit = dropBits ## TODO: make this configurable
+
     asInt  = True
     
     raw_charges     = np.array(row.dropna()).astype(int)
@@ -308,7 +311,7 @@ def writeThresAlgoBlock(d_csv):
     add_df.columns = ADD_headers
 
     ## calibCharge list of passing TC cells, padding zeros after list 
-    nDrop = 3 if isHDM else 1
+    nDrop = droppedBits(isHDM)
 
     qlist = df_passThres.apply(makeCHARGEQ, nDropBit=nDrop,axis=1)
     df_out[CHARGEQ_headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_headers)
@@ -442,8 +445,9 @@ def writeRegisters(odir,geomDF,subdet,layer,waferList,useV10):
         tc_remap[['ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']].set_index('ECON_TC_Number_PostMux').sort_index().transpose().to_csv("%s/mux_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),index=False,header=[f'MUX_{i}' for i in range(48)])    
 
         with open("%s/registers_D%sL%sW%s.csv"%(waferDir,subdet,layer,wafer),'w') as outFile:
-            outFile.write('isHDM\n')
-            outFile.write(f'{df_geom[df_geom.wafer==wafer].isHDM.any()}\n')
+            isHDM = df_geom[df_geom.wafer==wafer].isHDM.any()
+            outFile.write('isHDM, DropBits\n')
+            outFile.write(f'{isHDM}, {droppedBits(isHDM)}\n')
 
 
 
@@ -476,6 +480,15 @@ def writeThresholdFormat(d_csv):
 
 def writeBestChoice(d_csv):
     df_in = pd.read_csv(d_csv['calQ_csv'],index_col='entry')
+    df_registers = pd.read_csv(d_csv['register_csv'])
+    isHDM = df_registers.isHDM.loc[0]
+
+    df_wafer  = pd.read_csv(d_csv['wafer_csv'],index_col='entry')
+
+    nDrop = droppedBits(isHDM)
+
+    #truncate bits from the values before sorting for the best choice algorithm
+    df_in = pd.DataFrame(df_in.values >> nDrop, columns=df_in.columns,index=df_in.index)
 
     df_sorted, _ = sort(df_in)
     df_sorted_index = pd.DataFrame(df_in.apply(batcher_sort, axis=1))
@@ -486,10 +499,9 @@ def writeBestChoice(d_csv):
     df_sorted.to_csv(d_csv['bc_charge_csv'],index='entry')
     df_sorted_index.to_csv(d_csv['bc_address_csv'],index='entry')
 
-    df_registers = pd.read_csv(d_csv['register_csv'])
-    isHDM = df_registers.isHDM.loc[0]
-
     df_sorted[df_sorted_index.columns] = df_sorted_index
+    df_sorted['SUM'] = df_wafer['SUM']
+
     df_sorted['FRAMEQ'] = df_sorted.apply(formatBestChoiceOutput, args=(d_csv['nTC'],isHDM), axis=1)
     df_sorted['WORDCOUNT'] = (df_sorted.FRAMEQ.str.len()/16).astype(int)
     cols = [f'WORD_{i}' for i in range(28)]
@@ -509,16 +521,18 @@ def writeSTCAlgoBlock(d_csv):
     stcData_4x4 = df.apply(supertriggercell_4x4,axis=1)
 
     cols_STC_SUM = [f'STCSUM_{i}' for i in range(12)]
+    cols_CTC_SUM = [f'CTCSUM_{i}' for i in range(12)]
     cols_STC_IDX = [f'STCIDX_{i}' for i in range(12)]
     
     cols_STC_4x4_SUM = [f'MOD_SUM_STC_{i}' for i in range(3)]
     cols_STC_4x4_IDX = [f'MOD_SUM_STC_IDX_{i}' for i in range(3)]
-    
+
     df[cols_STC_SUM + cols_STC_IDX] = pd.DataFrame(stcData_2x2.tolist(),columns = cols_STC_SUM+cols_STC_IDX, index = df.index)
 
     df[cols_STC_4x4_SUM + cols_STC_4x4_IDX] = pd.DataFrame(stcData_4x4.tolist(),columns = cols_STC_4x4_SUM+cols_STC_4x4_IDX, index = df.index)
 
-    for c in cols_STC_SUM:
+    for i,c in enumerate(cols_STC_SUM):
+        df[cols_CTC_SUM[i]] = encodeList(df[c],0,4,3,asInt=True)
         df[c] = encodeList(df[c],0,5,4,asInt=True)
 
     for c in cols_STC_4x4_SUM:
@@ -529,7 +543,7 @@ def writeSTCAlgoBlock(d_csv):
     cols_WORDS = [f'WORD_{i}' for i in range(28)]
     df[cols_WORDS] = pd.DataFrame(df.apply(splitToWords, axis=1).tolist(),columns=cols_WORDS,index=df.index)
 
-    df[cols_STC_SUM+cols_STC_4x4_SUM].to_csv(d_csv['stc_sum_csv'],columns=cols_STC_SUM+cols_STC_4x4_SUM,index='entry')
+    df[cols_STC_SUM+cols_STC_4x4_SUM+cols_CTC_SUM].to_csv(d_csv['stc_sum_csv'],columns=cols_STC_SUM+cols_STC_4x4_SUM,index='entry')
     df[cols_STC_IDX+cols_STC_4x4_IDX].to_csv(d_csv['stc_idx_csv'],columns=cols_STC_IDX+cols_STC_4x4_IDX,index='entry')
     df[['FRAMEQ']+cols_WORDS].to_csv(d_csv['stc_format_csv'],columns=['FRAMEQ']+cols_WORDS,index='entry')
 
@@ -541,7 +555,7 @@ def writeRepeaterAlgoBlock(d_csv):
     df_registers = pd.read_csv(d_csv['register_csv'])
     isHDM = df_registers.isHDM.loc[0]
 
-    nDrop = 3 if isHDM else 1
+    nDrop = droppedBits(isHDM)
     qlist = df.apply(makeCHARGEQ, nDropBit=nDrop,axis=1)
     RPT_headers = [f'RPT_{i}' for i in range(48)]
 
@@ -585,7 +599,7 @@ def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, useV
     waferList = Layer_df.wafer.unique()
     if not wafer==-1:
         waferList = [wafer]
-        waferList = [31,261]
+#        waferList = [31,261]
     print ('Writing Inputs')
 
     writeInputCSV(odir,  Layer_df, subdet,layer,waferList, useV10, appendFile, jobInfo)
@@ -635,6 +649,7 @@ def runAlgos(subdet, layer, waferList, odir, useV10, jobInfo=""):
 
         bc_inputcsv ={
             'calQ_csv'      :f'{waferDir}/CALQ_output{jobInfo}.csv', #input
+            'wafer_csv'     :f'{waferDir}/threshold_wafer{jobInfo}.csv',        #input
             'bc_charge_csv' :f'{waferDir}/bc_charge{jobInfo}.csv',   #output
             'bc_address_csv':f'{waferDir}/bc_address{jobInfo}.csv',  #output
             'bc_format_csv' :f'{waferDir}/bc_formatblock{jobInfo}.csv',  #output
@@ -729,7 +744,10 @@ def main(opt,args):
         elif (opt.waferu is not None) and (opt.waferv is not None):
             waferList = [100*opt.waferu + opt.waferv]
         else:
-            df_geom = getGeomDF().reset_index()
+            if opt.useV10:
+                df_geom = getGeomDF_V9().reset_index()
+            else:
+                df_geom = getGeomDF_V10().reset_index()
             df_geom = df_geom[(df_geom.subdet==opt.subdet) & (df_geom.layer==opt.layer) & (df_geom.zside==1) ]
 
             waferList = df_geom.wafer.unique()

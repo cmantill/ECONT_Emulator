@@ -46,7 +46,7 @@ def parseConfig(configName):
                     continue
                 offsetChanges.append([int(values[0]),int(values[1]),int(values[3]),int(values[4])])
             if values[2].lower() in allowedFastCommands:
-                fastCommands.append([values[3].lower(),int(values[0]),int(values[1])])
+                fastCommands.append([values[2].lower(),int(values[0]),int(values[1])])
 
     return offsetChanges, fastCommands
 

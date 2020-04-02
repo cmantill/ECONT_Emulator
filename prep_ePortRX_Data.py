@@ -4,7 +4,7 @@ import numpy as np
 
 import warnings
 
-allowedFastCommands = ['ocr','bcr']
+allowedFastCommands = ['ocr','bcr','chipsync','linkreset']
 
 def convertToBin(val, nBits=32):
     return format(val, f'#0{nBits+2}b')[2:]
@@ -45,9 +45,10 @@ def parseConfig(configName):
                     print('  Expected: GodOrbit GodBucket OFFSET ePortNumber NewOffset')
                     continue
                 offsetChanges.append([int(values[0]),int(values[1]),int(values[3]),int(values[4])])
-            if values[2].lower() in allowedFastCommands:
+            elif values[2].lower() in allowedFastCommands:
                 fastCommands.append([values[2].lower(),int(values[0]),int(values[1])])
-
+            else:
+                print(f'Unknown command {values[2]}, skipping')
     return offsetChanges, fastCommands
 
                                 
@@ -55,6 +56,7 @@ def parseConfig(configName):
 def produceEportRX_input(inputFile, outputName='ECON_T_ePortRX.txt', configFile=None, N=-1, toHex=False, toBin=False, toInt=False):
 
     eportRXData = pd.read_csv(inputFile)
+
 
     if N==-1:
         N = len(eportRXData)
@@ -64,8 +66,7 @@ def produceEportRX_input(inputFile, outputName='ECON_T_ePortRX.txt', configFile=
 
     eportRXData = eportRXData[:N]
 
-    header = np.zeros(N,dtype=int) + 10
-    header[(np.arange(N) % 3564)==0] = 9
+    dfFastCommands = pd.DataFrame({'godOrbitNumber':(np.arange(N)/3564).astype(int),'godBucketNumber':(np.arange(N)%3564).astype(int),'command':'IDLE'})
 
     dataCols = [f'DATA_{i}' for i in range(12)]
     synchCols = [f'SYNCH_{i}' for i in range(12)]
@@ -75,11 +76,6 @@ def produceEportRX_input(inputFile, outputName='ECON_T_ePortRX.txt', configFile=
 
     eportRXData = eportRXData.assign(**{c:2**31 for c in synchCols})
     eportRXData = eportRXData.assign(**{c:2**32-1 for c in orbitCols})
-
-    eportRXData.loc[header==9,orbitCols] = 0
-
-    for c in dataCols:
-        eportRXData[c] = eportRXData[c] + (header<<28)
 
     eportRXData['godOrbitNumber'] = (np.arange(N)/3564).astype(int)
     eportRXData['godBucketNumber'] = np.arange(N)%3564
@@ -96,14 +92,7 @@ def produceEportRX_input(inputFile, outputName='ECON_T_ePortRX.txt', configFile=
     
     
     ### STARTING POINT OF CHANGING THE INPUTS
-    ### SHOULD A "GOOD" VERSION BE DUMPED FOR AND OUTPUT VALUE
-
-    #convert data columns to binary
-    for c in dataCols:
-        eportRXData[c] = eportRXData[c].apply(bin).str[2:]
-
-    # assume the starting point of all offsets is 128 (is there something better?)
-    offsets = [128]*12
+    ### SHOULD A "GOOD" VERSION BE DUMPED FOR AND OUTPUT VALUE, OR AFTER THE FAST COMMANDS
 
     ## load a config file with the requested changes:
     offsetChanges = []
@@ -113,7 +102,71 @@ def produceEportRX_input(inputFile, outputName='ECON_T_ePortRX.txt', configFile=
         offsetChanges, fastCommands = parseConfig(configFile)
 
     offsetChanges.sort()
-    
+    fastCommands.sort()
+
+    if len(fastCommands)>0:
+        #check for fast commmands issued in the same BX
+        usedBX = []
+        goodCommands = []
+        for f in fastCommands:
+            if not f[:2] in usedBX:
+                usedBX.append(f[:2])
+                goodCommands.append(f)
+            else:
+                print(f'A fast command is already issued for bucket ({f[0]},{f[1]}), skipping the command {f[2]} issued for the same bucket')
+        fastCommands = goodCommands[:]
+
+
+    #keep a global bunch crosing nubmer.  This can be used to later recreate the header
+    globalBXCounter = np.arange(N) % 3564
+
+    for f in fastCommands:
+        _command = f[0]
+        _orbit = f[1]
+        _bucket = f[2]
+        _globalBX = _orbit* 3564 + _bucket
+        if _command.lower() in ['ocr','bcr','chipsync']:
+            globalBXCounter[_globalBX:-1] = np.arange(len(globalBXCounter[_globalBX:-1])) % 3564
+        
+            dfFastCommands.loc[_globalBX,'Command'] = _command.upper()
+
+    # set header, with BX counter after the fast commands
+    header = np.zeros(N,dtype=int) + 10
+    header[globalBXCounter==0] = 9
+
+    eportRXData.loc[header==9,orbitCols] = 0
+
+    for c in dataCols:
+        eportRXData[c] = eportRXData[c] + (header<<28)
+
+
+    #do link resets
+    idle_packet = 2899102924 #0xaccccccc
+    print(fastCommands)
+    for f in fastCommands:
+        _command = f[0]
+        _orbit = f[1]
+        _bucket = f[2]
+        _globalBX = _orbit* 3564 + _bucket
+        print(f)
+        if _command.lower()=='linkreset':
+            dfFastCommands.loc[_globalBX,'Command'] = _command.upper()
+
+            _bxSyncEnd = _globalBX + 256
+            if _bxSyncEnd>=N:
+                _bxSyncEnd = N-1
+
+            eportRXData.loc[_globalBX:_bxSyncEnd,dataCols] = idle_packet
+
+
+
+    # assume the starting point of all offsets is 128 (is there something better?)
+    offsets = [128]*12
+
+    #convert data columns to binary
+    for c in dataCols:
+        eportRXData[c] = eportRXData[c].apply(bin).str[2:]
+
     for c in offsetChanges:
         _orbit = c[0]
         _bucket = c[1]
@@ -174,13 +227,14 @@ def produceEportRX_input(inputFile, outputName='ECON_T_ePortRX.txt', configFile=
             eportRXData[c] = eportRXData[c].apply(convertToHex)
         
     eportRXData.to_csv(outputName)
+    eportRXData.to_csv(outputName.replace('ePortRX','fastCommands'))
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i',"--inputFile", default = 'Example_ePortRX_Data.csv',dest="inputFile", help="input file name of ePort RX data")
-    parser.add_argument('-o',"--output", default = "ECON_T_ePortRX.txt",dest="outputName", help="file name for output")
-    parser.add_argument('-c','--config', default = None, dest='configFile', help='configuration file from which to read the changes')
-    parser.add_argument('-N', type=int, default = -1,dest="N", help="Number of BX to use, -1 is all in input")
+    parser.add_argument('-i',"--inputFile", default = 'Example_ePortRX_Data.csv',dest="inputFile", help="input file name of ePort RX data (default: Example_ePortRX_Data.csv)")
+    parser.add_argument('-o',"--output", default = "ECON_T_ePortRX.txt",dest="outputName", help="file name for output (default: ECON_T_ePortRX.txt)")
+    parser.add_argument('-c','--config', default = None, dest='configFile', help='configuration file from which to read the changes (default: None)')
+    parser.add_argument('-N', type=int, default = -1,dest="N", help="Number of BX to use, -1 is all in input (default: -1)")
     parser.add_argument('--hex',dest='toHex',default = False,action="store_true", help="save all values as hex")
     parser.add_argument('--bin',dest='toBin',default = False,action="store_true", help="save all values as bin")
     parser.add_argument('--int',dest='toInt',default = False,action="store_true", help="save all values as int")

@@ -1,4 +1,4 @@
-import optparse
+import argparse
 import pandas as pd
 import numpy as np
 import os
@@ -32,7 +32,6 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
         else:
             _waferU = int(waferInfo.groups()[2])
             _waferV = int(waferInfo.groups()[3])
-#            wafer = f'D{_subdetector}L{_layer}U{_waferU}V{_waferV}'
             _wafer=100*_waferU+_waferV
     else:
         _subdetector = 0
@@ -43,10 +42,13 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     wafer = f'D{_subdetector}L{_layer}W{_wafer}'
     inputData = directoryName
 
+
+    #read in data
     InputEPORTRX = pd.read_csv(f'{inputData}/EPORTRX_output.csv',index_col='entry')
     for c in InputEPORTRX.columns:
         InputEPORTRX[c] = InputEPORTRX[c].apply(int,args=(2,))
-    InputSM = pd.read_csv(f'{inputData}/SM_output.csv',index_col='entry')
+
+    InputF2F = pd.read_csv(f'{inputData}/F2F_output.csv',index_col='entry')
     InputCALQ = pd.read_csv(f'{inputData}/CALQ_output.csv',index_col='entry')
     Registers = pd.read_csv(f'{inputData}/registers_{wafer}.csv')
     
@@ -69,12 +71,15 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     
     isHDM = Registers.isHDM.loc[0]
 
+    #make output directory
     outputDir = f'{outputName}_{wafer}'
     if extraName is not None:
         outputDir = f'{outputName}_{wafer}_{extraName}'
 
     os.makedirs(outputDir,exist_ok=True)
 
+
+    #get sampling order
     if samplingList is None:
         SamplingOrder = []    
         SamplingOrder = np.random.choice(InputCALQ.index.values,nBX)
@@ -86,6 +91,8 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
 
     np.savetxt(f'{outputDir}/EventSampleOrder.csv', SamplingOrder,fmt='%d', header='entry',comments="")
 
+
+    # output basic wafer info
     with open(f'{outputDir}/WaferInfo.txt','w') as _file:
         _file.write(f'InputData {inputData}\n')
         _file.write(f'Subdet {_subdetector}\n')
@@ -125,8 +132,8 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     np.savetxt(f'{outputDir}/Algorithm_Input_Header.csv', headerValues,fmt='%d', header='HEADER',comments="")
     np.savetxt(f'{outputDir}/Algorithm_Output_Header.csv', headerValues,fmt='%d', header='HEADER',comments="")
 
-    InputEPORTRX.astype(int).loc[SamplingOrder].to_csv(f'{outputDir}/Mux_Input_ePortRX.csv',index=False)
-    InputSM.loc[SamplingOrder].to_csv(f'{outputDir}/Mux_Output_SM.csv',index=False)
+    InputEPORTRX.astype(int).loc[SamplingOrder].to_csv(f'{outputDir}/MuxFixCalib_Input_ePortRX.csv',index=False)
+    InputF2F.loc[SamplingOrder].to_csv(f'{outputDir}/MuxFixCalib_PreCalibration_F2F.csv',index=False)
     InputCALQ.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Input_CalQ.csv',index=False)
 
     Threshold_AddMap.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_AddrMap.csv',index=False)
@@ -139,22 +146,26 @@ def sampleData(directoryName="./", outputName="outputTest", nBX=5000, samplingLi
     BC_Addresses.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_BC_TC_map.csv',index=False)
     BC_Charge.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_BC_Charge.csv',index=False,header=[f'BC_CHARGE_{i}' for i in range(48)])
 
-    Cols_STC_2x2_Sum = [f'STC_2x2_SUM_{i}' for i in range(12)]
-    Cols_STC_2x2_Idx = [f'STC_2x2_IDX_{i}' for i in range(12)]
+    Cols_XTC4_9 = [f'XTC4_9_{i}' for i in range(12)]
+    Cols_XTC4_7 = [f'XTC4_7_{i}' for i in range(12)]
 
-    Cols_Mod_Sum = [f'MOD_SUM_STC_{i}' for i in range(3)]
-    Cols_Mod_Sum_Idx = [f'MOD_SUM_STC_IDX_{i}' for i in range(3)]
+    Cols_MAX4_ADDR = [f'MAX4_ADDR_{i}' for i in range(12)]
 
-    STC_Sum.columns = Cols_STC_2x2_Sum + Cols_Mod_Sum
-    STC_Idx.columns = Cols_STC_2x2_Idx + Cols_Mod_Sum_Idx
+    Cols_XTC16_9 = [f'XTC16_9_{i}' for i in range(3)]
+    Cols_MAX16_ADDR = [f'MAX16_ADDR_{i}' for i in range(3)]
 
-    STC_Sum.loc[SamplingOrder,Cols_STC_2x2_Sum].to_csv(f'{outputDir}/Algorithm_Output_STC_2x2_Sum.csv',index=False)
-    STC_Idx.loc[SamplingOrder,Cols_STC_2x2_Idx].to_csv(f'{outputDir}/Algorithm_Output_STC_Idx.csv',index=False)
+    STC_Sum.columns = Cols_XTC4_9 + Cols_XTC16_9 + Cols_XTC4_7
+    STC_Idx.columns = Cols_MAX4_ADDR + Cols_MAX16_ADDR
+
+    STC_Sum.loc[SamplingOrder,Cols_XTC4_7].to_csv(f'{outputDir}/Algorithm_Output_XTC4_7.csv',index=False)
+    STC_Sum.loc[SamplingOrder,Cols_XTC4_9].to_csv(f'{outputDir}/Algorithm_Output_XTC4_9.csv',index=False)
+
+    STC_Idx.loc[SamplingOrder,Cols_MAX4_ADDR].to_csv(f'{outputDir}/Algorithm_Output_MAX4_ADDR.csv',index=False)
     
 
-    STC_Sum['MOD_SUM_STC'] = shiftBits(STC_Sum.MOD_SUM_STC_0,0) + shiftBits(STC_Sum.MOD_SUM_STC_1,8) + shiftBits(STC_Sum.MOD_SUM_STC_2,16)
-    STC_Sum.loc[SamplingOrder,['MOD_SUM_STC']].to_csv(f'{outputDir}/Algorithm_Output_Mod_Sum_stc.csv',index=False)
-    STC_Idx.loc[SamplingOrder,Cols_Mod_Sum_Idx].to_csv(f'{outputDir}/Algorithm_Output_Mod_Sum_Idx_stc.csv',index=False)
+    STC_Sum['XTC16_9'] = shiftBits(STC_Sum.XTC16_9_0,0) + shiftBits(STC_Sum.XTC16_9_1,9) + shiftBits(STC_Sum.XTC16_9_2,16)
+    STC_Sum.loc[SamplingOrder,['XTC16_9']].to_csv(f'{outputDir}/Algorithm_Output_XTC16_9.csv',index=False)
+    STC_Idx.loc[SamplingOrder,Cols_MAX16_ADDR].to_csv(f'{outputDir}/Algorithm_Output_MAX16_ADDR.csv',index=False)
 
     RPT_Chg.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_RepeaterQ.csv',index=False)
 
@@ -250,16 +261,16 @@ def alterCSVFiles(outputDir):
 
 
 if __name__=='__main__':
-    parser = optparse.OptionParser()
-    parser.add_option('-i',"--inputDir", type="string", default = None,dest="inputDir", help="input directory to sample")
-    parser.add_option('-o',"--output", type="string", default = "outputData",dest="outputName", help="file name for output")
-    parser.add_option('-N',"--nBX", type=int, default = None,dest="nBX", help="number of BX to simulate")
-    parser.add_option('--samplingList', '--sampleList', type="string", default = None,dest="samplingList", help="file containing the list of BX to sample")
-    parser.add_option('--extra', '--extraText', type="string", default = None,dest="extraText", help="extra text ot append to directory name (ex: version number, other notes to track)")
-    parser.add_option('--CSVNoSpace',dest='replaceCSVDelim', action='store_false', default=True, help='keep the output csv files as comma delimited with no trailing space')
-    (opt, args) = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i',"--inputDir", default = None,dest="inputDir", required=True,help="input directory to sample (required)")
+    parser.add_argument('-o',"--output", default = "outputData",dest="outputName", help="file name for output (default: outputData)")
+    parser.add_argument('-N',"--nBX", type=int, default = 100,dest="nBX", help="number of BX to simulate (default: 100)")
+    parser.add_argument('--samplingList', '--sampleList', default = None,dest="samplingList", help="file containing the list of BX to sample (default: None)")
+    parser.add_argument('--extra', '--extraText', default = None,dest="extraText", help="extra text ot append to directory name (ex: version number, other notes to track) (default: None)")
+    parser.add_argument('--CSVNoSpace',dest='replaceCSVDelim', action='store_false', default=True, help='keep the output csv files as comma delimited with no trailing space')
+    args = parser.parse_args()
 
-    outputDir = sampleData(directoryName = opt.inputDir, outputName = opt.outputName, nBX = opt.nBX, samplingList = opt.samplingList, extraName=opt.extraText)
+    outputDir = sampleData(directoryName = args.inputDir, outputName = args.outputName, nBX = args.nBX, samplingList = args.samplingList, extraName=args.extraText)
 
     alterCSVFiles(outputDir)
 
@@ -273,8 +284,11 @@ if __name__=='__main__':
                  ["Formatter_Buffer_Input_NTCQ.csv",                 "Algorithm_Output_NTCQ.csv"],                 
                  ["Formatter_Buffer_Input_Mod_Sum.csv",              "Algorithm_Output_Mod_Sum.csv"],              
                  ["Formatter_Buffer_Input_Sum.csv",                  "Algorithm_Output_Sum.csv"],                  
-                 ["Formatter_Buffer_Inputr_STC_2x2_Sum.csv",         "Algorithm_Output_STC_2x2_Sum.csv"],         
-                 ["Formatter_Buffer_Input_Mod_Sum_stc.csv",          "Algorithm_Output_Mod_Sum_stc.csv"],          
+                 ["Formatter_Buffer_Input_XTC4_9.csv",               "Algorithm_Output_XTC4_9.csv"],         
+                 ["Formatter_Buffer_Input_XTC4_7.csv",               "Algorithm_Output_XTC4_7.csv"],         
+                 ["Formatter_Buffer_Input_XTC16_9.csv",              "Algorithm_Output_XTC16_9.csv"],          
+                 ["Formatter_Buffer_Input_MAX4_ADDR.csv",            "Algorithm_Output_MAX4_ADDR.csv"],          
+                 ["Formatter_Buffer_Input_MAX16_ADDR.csv",           "Algorithm_Output_MAX16_ADDR.csv"],          
                  ["Formatter_Buffer_Input_BC_Charge.csv",            "Algorithm_Output_BC_Charge.csv"],            
                  ["Formatter_Buffer_Input_BC_TC_map.csv",            "Algorithm_Output_BC_TC_map.csv"],            
                  ["Formatter_Buffer_Input_RepeaterQ.csv",            "Algorithm_Output_RepeaterQ.csv"]]            

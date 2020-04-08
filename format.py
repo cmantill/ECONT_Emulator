@@ -145,11 +145,11 @@ def formatBestChoiceOutput(row, nTC = 1, isHDM=True,debug=False):
 
 def formatSTCOutput(row,isHDM=False,debug=False):
     if isHDM:
-        colsSUM=[f'STCSUM_{i}' for i in range(12)]
-        colsIDX=[f'STCIDX_{i}' for i in range(12)]
+        colsSUM=[f'XTC4_9_{i}' for i in range(12)]
+        colsIDX=[f'MAX4_ADDR_{i}' for i in range(12)]
     else:
-        colsSUM=[f'MOD_SUM_STC_{i}' for i in range(3)]
-        colsIDX=[f'MOD_SUM_STC_IDX_{i}' for i in range(3)]
+        colsSUM=[f'XTC16_9_{i}' for i in range(3)]
+        colsIDX=[f'MAX16_ADDR_{i}' for i in range(3)]
         
 
     SumData = row[colsSUM].values

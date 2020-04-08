@@ -24,7 +24,7 @@ encodeList = np.vectorize(encode)
 tc_remap = pd.read_csv("LDM_TC_Mapping.csv")[['TC_Number','ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']]
 
 def droppedBits(isHDM):
-    return 4 if isHDM else 2
+    return 3 if isHDM else 1
 
 def processTree(_tree, geomDF, subdet, layer, useV10=False, jobNumber=0, nEvents=-1):
     #load dataframe
@@ -360,7 +360,7 @@ def writeInputCSV(odir,df,subdet,layer,waferList,useV10,appendFile=False,jobInfo
     EPORTRX_headers = ["ePortRxDataGroup_%s"%i for i in range(0,12)]
     ENCODED_headers = ["ENCODED_%s"%i for i in range(0,48)]
     #output of switch matrix ( i.e. decoded charge)
-    SM_headers = ["SM_%s"%i for i in range(0,48)]
+    F2F_headers = ["F2F_%s"%i for i in range(0,48)]
     #output of Calibration ( i.e. calib charge)
     CALQ_headers = ["CALQ_%s"%i for i in range(0,48)]
 
@@ -368,11 +368,11 @@ def writeInputCSV(odir,df,subdet,layer,waferList,useV10,appendFile=False,jobInfo
 #    gb = df.groupby(['subdet','layer','wafer','entry'],group_keys=False)
 
     encodedlist   = gb[['ECON_TC_Number_PreMux','encodedCharge']].apply(makeTCindexCols,'encodedCharge',-1,'ECON_TC_Number_PreMux')
-    smlist   = gb[['triggercell','decodedCharge']].apply(makeTCindexCols,'decodedCharge',-1)
+    f2flist   = gb[['triggercell','decodedCharge']].apply(makeTCindexCols,'decodedCharge',-1)
     calQlist = gb[['triggercell','calibCharge']].apply(makeTCindexCols,'calibCharge',-1)
-    df_out     = pd.DataFrame(index=smlist.index)
+    df_out     = pd.DataFrame(index=f2flist.index)
     df_out[ENCODED_headers]= pd.DataFrame((encodedlist).values.tolist(),index=encodedlist.index)
-    df_out[SM_headers]     = pd.DataFrame((smlist).values.tolist(),index=smlist.index)
+    df_out[F2F_headers]     = pd.DataFrame((f2flist).values.tolist(),index=f2flist.index)
     df_out[CALQ_headers]   = pd.DataFrame((calQlist).values.tolist(),index=calQlist.index)
     df_out.fillna(0,inplace=True)
 
@@ -395,22 +395,23 @@ def writeInputCSV(odir,df,subdet,layer,waferList,useV10,appendFile=False,jobInfo
 
         if not os.path.exists(waferDir):
             os.makedirs(waferDir, exist_ok=True)
+            os.makedirs(f'{waferDir}/Idle', exist_ok=True)
         
-        # df_out     = pd.DataFrame(index=smlist.loc[subdet,layer,_wafer].index)
-        # df_out[SM_headers]     = pd.DataFrame((smlist.loc[subdet,layer,_wafer]).values.tolist(),index=smlist.loc[subdet,layer,_wafer].index)
+        # df_out     = pd.DataFrame(index=f2flist.loc[subdet,layer,_wafer].index)
+        # df_out[F2F_headers]     = pd.DataFrame((f2flist.loc[subdet,layer,_wafer]).values.tolist(),index=f2flist.loc[subdet,layer,_wafer].index)
         # df_out[CALQ_headers]   = pd.DataFrame((calQlist.loc[subdet,layer,_wafer]).values.tolist(),index=calQlist.loc[subdet,layer,_wafer].index)
         # df_out.fillna(0,inplace=True)
         
-        waferInput = pd.DataFrame(index=df.entry.unique(),columns=SM_headers+CALQ_headers+EPORTRX_headers)
+        waferInput = pd.DataFrame(index=df.entry.unique(),columns=F2F_headers+CALQ_headers+EPORTRX_headers)
         waferInput.index.name='entry'
-        waferInput[SM_headers+CALQ_headers+EPORTRX_headers] = df_out.loc[_wafer][SM_headers+CALQ_headers+EPORTRX_headers]
+        waferInput[F2F_headers+CALQ_headers+EPORTRX_headers] = df_out.loc[_wafer][F2F_headers+CALQ_headers+EPORTRX_headers]
         
         waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna("0000000000000000000000000000")
         waferInput.fillna(0,inplace=True)
 
-        waferInput = waferInput.astype({x:int for x in SM_headers+CALQ_headers})
+        waferInput = waferInput.astype({x:int for x in F2F_headers+CALQ_headers})
         
-        waferInput.to_csv(f"{waferDir}/SM_output{jobInfo}.csv"  ,columns=SM_headers,index='entry', mode=writeMode, header=header)
+        waferInput.to_csv(f"{waferDir}/F2F_output{jobInfo}.csv"  ,columns=F2F_headers,index='entry', mode=writeMode, header=header)
         waferInput.to_csv(f"{waferDir}/CALQ_output{jobInfo}.csv",columns=CALQ_headers,index='entry', mode=writeMode, header=header)
         waferInput.to_csv(f"{waferDir}/EPORTRX_output{jobInfo}.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
 
@@ -520,22 +521,22 @@ def writeSTCAlgoBlock(d_csv):
     stcData_2x2 = df.apply(supertriggercell_2x2,axis=1)
     stcData_4x4 = df.apply(supertriggercell_4x4,axis=1)
 
-    cols_STC_SUM = [f'STCSUM_{i}' for i in range(12)]
-    cols_CTC_SUM = [f'CTCSUM_{i}' for i in range(12)]
-    cols_STC_IDX = [f'STCIDX_{i}' for i in range(12)]
+    cols_XTC4_9 = [f'XTC4_9_{i}' for i in range(12)]
+    cols_XTC4_7 = [f'XTC4_7_{i}' for i in range(12)]
+    cols_MAX4_ADDR = [f'MAX4_ADDR_{i}' for i in range(12)]
     
-    cols_STC_4x4_SUM = [f'MOD_SUM_STC_{i}' for i in range(3)]
-    cols_STC_4x4_IDX = [f'MOD_SUM_STC_IDX_{i}' for i in range(3)]
+    cols_XTC16_9 = [f'XTC16_9_{i}' for i in range(3)]
+    cols_MAX16_ADDR = [f'MAX16_ADDR_{i}' for i in range(3)]
 
-    df[cols_STC_SUM + cols_STC_IDX] = pd.DataFrame(stcData_2x2.tolist(),columns = cols_STC_SUM+cols_STC_IDX, index = df.index)
+    df[cols_XTC4_9 + cols_MAX4_ADDR] = pd.DataFrame(stcData_2x2.tolist(),columns = cols_XTC4_9+cols_MAX4_ADDR, index = df.index)
 
-    df[cols_STC_4x4_SUM + cols_STC_4x4_IDX] = pd.DataFrame(stcData_4x4.tolist(),columns = cols_STC_4x4_SUM+cols_STC_4x4_IDX, index = df.index)
+    df[cols_XTC16_9 + cols_MAX16_ADDR] = pd.DataFrame(stcData_4x4.tolist(),columns = cols_XTC16_9+cols_MAX16_ADDR, index = df.index)
 
-    for i,c in enumerate(cols_STC_SUM):
-        df[cols_CTC_SUM[i]] = encodeList(df[c],0,4,3,asInt=True)
+    for i,c in enumerate(cols_XTC4_9):
+        df[cols_XTC4_7[i]] = encodeList(df[c],0,4,3,asInt=True)
         df[c] = encodeList(df[c],0,5,4,asInt=True)
 
-    for c in cols_STC_4x4_SUM:
+    for c in cols_XTC16_9:
         df[c] = encodeList(df[c],0,5,4,asInt=True)
 
 
@@ -543,8 +544,8 @@ def writeSTCAlgoBlock(d_csv):
     cols_WORDS = [f'WORD_{i}' for i in range(28)]
     df[cols_WORDS] = pd.DataFrame(df.apply(splitToWords, axis=1).tolist(),columns=cols_WORDS,index=df.index)
 
-    df[cols_STC_SUM+cols_STC_4x4_SUM+cols_CTC_SUM].to_csv(d_csv['stc_sum_csv'],columns=cols_STC_SUM+cols_STC_4x4_SUM,index='entry')
-    df[cols_STC_IDX+cols_STC_4x4_IDX].to_csv(d_csv['stc_idx_csv'],columns=cols_STC_IDX+cols_STC_4x4_IDX,index='entry')
+    df[cols_XTC4_9+cols_XTC16_9+cols_XTC4_7].to_csv(d_csv['stc_sum_csv'],columns=cols_XTC4_9+cols_XTC16_9+cols_XTC4_7,index='entry')
+    df[cols_MAX4_ADDR+cols_MAX16_ADDR].to_csv(d_csv['stc_idx_csv'],columns=cols_MAX4_ADDR+cols_MAX16_ADDR,index='entry')
     df[['FRAMEQ']+cols_WORDS].to_csv(d_csv['stc_format_csv'],columns=['FRAMEQ']+cols_WORDS,index='entry')
 
 
@@ -568,7 +569,93 @@ def writeRepeaterAlgoBlock(d_csv):
 
     df.to_csv(d_csv['repeater_format_csv'],columns=['FRAMEQ']+cols,index='entry')
 
+
+def simulateIdleWord(d_csv):
+
+    waferDir = d_csv['waferDir']
+    idleDir = f'{waferDir}/Idle'
+
+    idleWord = 'accccccc'
+    idleHeaderStripped = int(idleWord[1:],16)
+    #create eportRX output from idle word
+    df = pd.DataFrame({f'ePortRxDataGroup_{i}':bin(idleHeaderStripped)[2:] for i in range(12)},index=[0])
+    df.index.name='entry'
+    df.to_csv(f'{idleDir}/EPORTRX_output.csv')
+
+    #split idle into 4 7-bit values
+    splitValues_preMux = np.array([idleHeaderStripped>>21 & 127,idleHeaderStripped>>14 & 127,idleHeaderStripped>>7 & 127,idleHeaderStripped & 127]*12)
+    muxVals = pd.read_csv(d_csv['mux_csv']).loc[0].values
+    splitValues_postMux = splitValues_preMux[muxVals]
+
+    df_registers = pd.read_csv(d_csv['register_csv'])
+    isHDM = df_registers.isHDM.loc[0]
+
+    # float to fix
+    nDrop = 3 if isHDM else 1
+
+    decodeV = np.vectorize(decode)
+
+    F2F_values = decodeV(splitValues_postMux, nDrop, 4, 3)
+    df = pd.DataFrame([F2F_values],columns=[f'F2F_{i}' for i in range(48)])
+    df.index.name='entry'
+    df.to_csv(f'{idleDir}/F2F_output.csv')
+
+    #calibration
+    calibVals = pd.read_csv(d_csv['calib_csv']).loc[0].values
+    CALQ_values = (F2F_values*calibVals).astype(int)
+    df = pd.DataFrame([CALQ_values],columns=[f'CALQ_{i}' for i in range(48)])
+    df.index.name='entry'
+    df.to_csv(f'{idleDir}/CALQ_output.csv')
+
+    print('Wrote Data')
+
+    #threshold
+    threshold_inputcsv ={
+        'calQ_csv'         :f'{idleDir}/CALQ_output.csv', #input
+        'thres_csv'        :d_csv['thres_csv'], #input threshold
+        'thres_charge_csv' :f'{idleDir}/threshold_charge.csv',   #output
+        'thres_address_csv':f'{idleDir}/threshold_address.csv',  #output
+        'thres_wafer_csv'  :f'{idleDir}/threshold_wafer.csv',  #output
+        'register_csv'     :d_csv['register_csv'], #input
+    }
+    writeThresAlgoBlock(threshold_inputcsv)
+    format_inputcsv ={
+        'wafer_csv'    :f'{idleDir}/threshold_wafer.csv',        #input
+        'add_csv'      :f'{idleDir}/threshold_address.csv',      #input
+        'charge_csv'   :f'{idleDir}/threshold_charge.csv',       #input
+        'format_csv'   :f'{idleDir}/threshold_formatblock.csv',  #output
+        'register_csv' :d_csv['register_csv'], #input
+    }
+    writeThresholdFormat(format_inputcsv)
+
+    bc_inputcsv ={
+        'calQ_csv'      :f'{idleDir}/CALQ_output.csv', #input
+        'wafer_csv'     :f'{idleDir}/threshold_wafer.csv',        #input
+        'bc_charge_csv' :f'{idleDir}/bc_charge.csv',   #output
+        'bc_address_csv':f'{idleDir}/bc_address.csv',  #output
+        'bc_format_csv' :f'{idleDir}/bc_formatblock.csv',  #output
+        'register_csv'  :d_csv['register_csv'], #input
+        'nTC'           :d_csv['bc_nTC'],
+    }
+    writeBestChoice(bc_inputcsv)
     
+    stc_inputcsv ={
+        'calQ_csv'       :f'{idleDir}/CALQ_output.csv', #input
+        'stc_sum_csv'    :f'{idleDir}/stc_sum.csv',   #output
+        'stc_idx_csv'    :f'{idleDir}/stc_idx.csv',   #output
+        'stc_format_csv' :f'{idleDir}/stc_formatblock.csv',   #output
+        'register_csv'   :d_csv['register_csv'], #input
+    }
+    writeSTCAlgoBlock(stc_inputcsv)
+    
+    repeater_inputcsv ={
+        'calQ_csv'            :f'{idleDir}/CALQ_output.csv', #input
+        'repeater_csv'        :f'{idleDir}/repeater_charge.csv',   #output
+        'repeater_format_csv' :f'{idleDir}/repeater_formatblock.csv',   #output
+        'register_csv'        :d_csv['register_csv'], #input
+    }
+    writeRepeaterAlgoBlock(repeater_inputcsv)
+
 
 def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, useV10=False, appendFile=False, jobInfo=""):
 
@@ -599,7 +686,6 @@ def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, useV
     waferList = Layer_df.wafer.unique()
     if not wafer==-1:
         waferList = [wafer]
-#        waferList = [31,261]
     print ('Writing Inputs')
 
     writeInputCSV(odir,  Layer_df, subdet,layer,waferList, useV10, appendFile, jobInfo)
@@ -674,12 +760,35 @@ def runAlgos(subdet, layer, waferList, odir, useV10, jobInfo=""):
             'register_csv'        :f'{waferDir}/registers_D{subdet}L{layer}W{_wafer}.csv',
         }
         writeRepeaterAlgoBlock(repeater_inputcsv)
-    
+
+        #only need to do idle word for first job
+        if jobInfo=='' or jobInfo.startswith('_1of'):
+            idle_inputcsv ={
+                'waferDir'     : waferDir,
+                'bc_nTC'       : tcPerLink[linksPerLayer[layer]],
+                'register_csv' : f'{waferDir}/registers_D{subdet}L{layer}W{_wafer}.csv',
+                'mux_csv'      : f'{waferDir}/mux_D{subdet}L{layer}W{_wafer}.csv',
+                'calib_csv'    : f'{waferDir}/calib_D{subdet}L{layer}W{_wafer}.csv',
+                'thres_csv'    : f'{waferDir}/thres_D{subdet}L{layer}W{_wafer}.csv',
+            }
+            simulateIdleWord(idle_inputcsv)
+        
 
 def main(opt,args):
     print ('start')
 
     jobSplitText = ""
+
+    subdet = opt.subdet
+    layer = opt.layer
+
+    if opt.useV10:
+        if subdet==3:
+            subdet=1
+        if subdet==4:
+            subdet=2
+        if subdet==5:
+            subdet=10
 
     if not opt.skipInput:
         print('loading')
@@ -733,26 +842,25 @@ def main(opt,args):
         for i,fName in enumerate(fileList):
             print(i, fName)
             wafer = opt.wafer
-            if (opt.waferu is not None) and (opt.waferv is not None):
+            if opt.useV10:
                 wafer = opt.waferu*100 + opt.waferv
-            waferList = processNtupleInputs(fName, geomDF, opt.subdet, opt.layer, wafer, opt.odir, opt.Nevents, useV10=opt.useV10, appendFile=i>0, jobInfo=jobSplitText)
+            waferList = processNtupleInputs(fName, geomDF, subdet, layer, wafer, opt.odir, opt.Nevents, useV10=opt.useV10, appendFile=i>0, jobInfo=jobSplitText)
         print(waferList)
     else:
         if not opt.wafer==-1:
             waferList = [opt.wafer]
-            waferList = [31,261]
-        elif (opt.waferu is not None) and (opt.waferv is not None):
-            waferList = [100*opt.waferu + opt.waferv]
+            if opt.useV10:
+                waferList = [100*opt.waferu + opt.waferv]
         else:
             if opt.useV10:
                 df_geom = getGeomDF_V9().reset_index()
             else:
                 df_geom = getGeomDF_V10().reset_index()
-            df_geom = df_geom[(df_geom.subdet==opt.subdet) & (df_geom.layer==opt.layer) & (df_geom.zside==1) ]
+            df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & (df_geom.zside==1) ]
 
             waferList = df_geom.wafer.unique()
     if not opt.skipAlgo:
-        runAlgos(opt.subdet, opt.layer, waferList, opt.odir, useV10=opt.useV10, jobInfo=jobSplitText)
+        runAlgos(subdet, layer, waferList, opt.odir, useV10=opt.useV10, jobInfo=jobSplitText)
 
 if __name__=='__main__':
     parser = optparse.OptionParser()
@@ -763,8 +871,8 @@ if __name__=='__main__':
 
     parser.add_option('-o',"--odir", type="string", default = './',dest="odir", help="output directory")
     parser.add_option('-w',"--wafer" , type=int, default = 31,dest="wafer" , help="which wafer to write")
-    parser.add_option('-u',"--waferu" , type=int, default = None,dest="waferu" , help="which wafer to write")
-    parser.add_option('-v',"--waferv" , type=int, default = None,dest="waferv" , help="which wafer to write")
+    parser.add_option('-u',"--waferu" , type=int, default = 4,dest="waferu" , help="which wafer to write")
+    parser.add_option('-v',"--waferv" , type=int, default = 2,dest="waferv" , help="which wafer to write")
     parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
     parser.add_option('-N', type=int, default = 1 ,dest="Nfiles", help="Limit on number of files to read (-1 is all)")

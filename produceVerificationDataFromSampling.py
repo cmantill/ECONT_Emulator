@@ -51,9 +51,9 @@ def writeOutputData(inputData, outputDir, SamplingOrder, headerValues, TX_SYNC_W
     Threshold_AddMap.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_AddrMap.csv',index=False)
     Threshold_Charge.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_ChargeQ.csv',index=False)
     Threshold_Wafer.loc[SamplingOrder,["NTCQ"]].to_csv(f'{outputDir}/Algorithm_Output_NTCQ.csv',index=False)
-    Threshold_Wafer.loc[SamplingOrder,["SUM"]].to_csv(f'{outputDir}/Algorithm_Output_Sum.csv',index=False)
-    Threshold_Wafer['MOD_SUM'] = shiftBits(Threshold_Wafer.MOD_SUM_0,0) + shiftBits(Threshold_Wafer.MOD_SUM_1,8) + shiftBits(Threshold_Wafer.MOD_SUM_2,16)
-    Threshold_Wafer.loc[SamplingOrder,["MOD_SUM"]].to_csv(f'{outputDir}/Algorithm_Output_Mod_Sum.csv',index=False)
+    Threshold_Wafer.loc[SamplingOrder,["SUM_NOT_TRANSMITTED"]].to_csv(f'{outputDir}/Algorithm_Output_Sum.csv',index=False,header='SUM')
+#    Threshold_Wafer['MOD_SUM'] = shiftBits(Threshold_Wafer.MOD_SUM_0,0) + shiftBits(Threshold_Wafer.MOD_SUM_1,8) + shiftBits(Threshold_Wafer.MOD_SUM_2,16)
+#    Threshold_Wafer.loc[SamplingOrder,["MOD_SUM"]].to_csv(f'{outputDir}/Algorithm_Output_Mod_Sum.csv',index=False)
 
     BC_Addresses.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_BC_TC_map.csv',index=False)
     BC_Charge.loc[SamplingOrder].to_csv(f'{outputDir}/Algorithm_Output_BC_Charge.csv',index=False,header=[f'BC_CHARGE_{i}' for i in range(48)])

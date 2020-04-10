@@ -127,11 +127,11 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1):
         usedBX = []
         goodCommands = []
         for f in fastCommands:
-            if not f[:2] in usedBX:
-                usedBX.append(f[:2])
+            if not f[1:] in usedBX:
+                usedBX.append(f[1:])
                 goodCommands.append(f)
             else:
-                print(f'A fast command is already issued for bucket ({f[0]},{f[1]}), skipping the command {f[2]} issued for the same bucket')
+                print(f'A fast command is already issued for bucket ({f[1]},{f[2]}), skipping the command {f[0]} issued for the same bucket')
         fastCommands = goodCommands[:]
 
 
@@ -166,11 +166,11 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1):
         _orbit = f[1]
         _bucket = f[2]
         _globalBX = _orbit* 3564 + _bucket
-
+        
         if _command.lower()=='linkreset':
             dfFastCommands.loc[_globalBX,'Command'] = _command.upper()
 
-            _bxSyncEnd = _globalBX + 256
+            _bxSyncEnd = _globalBX + 255
             if _bxSyncEnd>=N:
                 _bxSyncEnd = N-1
 
@@ -238,12 +238,12 @@ def getVerificationData(inputDir, outputDir, fastCommands, N):
     registerFiles = ['Algorithm_Input_DroppedBits.csv','Algorithm_Input_HighDensity.csv','Algorithm_Input_Threshold.csv','Algorithm_Input_Type_BC.csv','Algorithm_Input_Type_RPT.csv','Algorithm_Input_Type_STC.csv','Algorithm_Input_Type_TS.csv','Calibration_Input_Calibration.csv','Formatter_Buffer_Input_Tx_Sync_Word.csv']
 
     for _fName in registerFiles:
-        df = pd.read_csv(f'{inputDir}/{_fName}',skipinitialspace=True)
-        df.loc[:N].to_csv(f'{outputDir}/{_fName}')
+        df = pd.read_csv(f'{inputDir}/{_fName}',skipinitialspace=True).loc[:N-1]
+        df.to_csv(f'{outputDir}/{_fName}',index=False)
 
 
     #Need to change for link reset
-    dataFiles = ['Algorithm_Input_CalQ.csv','Algorithm_Output_AddrMap.csv','Algorithm_Output_BC_Charge.csv','Algorithm_Output_BC_TC_map.csv','Algorithm_Output_ChargeQ.csv','Algorithm_Output_MAX16_ADDR.csv','Algorithm_Output_MAX4_ADDR.csv','Algorithm_Output_Mod_Sum.csv','Algorithm_Output_NTCQ.csv','Algorithm_Output_RepeaterQ.csv','Algorithm_Output_Sum.csv','Algorithm_Output_XTC16_9.csv','Algorithm_Output_XTC4_7.csv','Algorithm_Output_XTC4_9.csv','MuxFixCalib_Input_ePortRX.csv','MuxFixCalib_PreCalibration_F2F.csv']
+    dataFiles = ['Algorithm_Input_CalQ.csv','Algorithm_Output_AddrMap.csv','Algorithm_Output_BC_Charge.csv','Algorithm_Output_BC_TC_map.csv','Algorithm_Output_ChargeQ.csv','Algorithm_Output_MAX16_ADDR.csv','Algorithm_Output_MAX4_ADDR.csv','Algorithm_Output_NTCQ.csv','Algorithm_Output_RepeaterQ.csv','Algorithm_Output_Sum.csv','Algorithm_Output_XTC16_9.csv','Algorithm_Output_XTC4_7.csv','Algorithm_Output_XTC4_9.csv','MuxFixCalib_Input_ePortRX.csv','MuxFixCalib_PreCalibration_F2F.csv']
         
     #need to change for link reset data, and update headers
     formatFiles = ['Formatter_Output_BC.csv','Formatter_Output_RPT.csv','Formatter_Output_STC.csv','Formatter_Output_ThresholdSum.csv']
@@ -254,15 +254,15 @@ def getVerificationData(inputDir, outputDir, fastCommands, N):
     if len(fastCommands)==0:
         #copy all files over as they are
         for _fName in dataFiles+formatFiles+headerFiles:
-            df = pd.read_csv(f'{inputDir}/{_fName}',skipinitialspace=True)
-            df.loc[:N].to_csv(f'{outputDir}/{_fName}')
+            df = pd.read_csv(f'{inputDir}/{_fName}',skipinitialspace=True).loc[:N-1]
+            df.to_csv(f'{outputDir}/{_fName}',index=False)
     else:
 
 
         #read in the csv files that will need to be changed by a link reset
-        inputValuesDF = {_fName: pd.read_csv('{inputDir}/{_fName}',skipinitialspace=True) for _fName in dataFiles+formatFiles}
-        idleValuesDF = {_fName: pd.read_csv('{inputDir}/Idle/{_fName}',skipinitialspace=True) for _fName in dataFiles+formatFiles}
-        
+        inputValuesDF = {_fName: pd.read_csv(f'{inputDir}/{_fName}',skipinitialspace=True).loc[:N-1] for _fName in dataFiles+formatFiles}
+        idleValuesDF = {_fName: pd.read_csv(f'{inputDir}/Idle/{_fName}',skipinitialspace=True).loc[:N-1] for _fName in dataFiles+formatFiles}
+
         globalBXCounter = np.arange(N) % 3564
 
         for f in fastCommands:
@@ -270,37 +270,38 @@ def getVerificationData(inputDir, outputDir, fastCommands, N):
             _orbit = f[1]
             _bucket = f[2]
             _globalBX = _orbit* 3564 + _bucket
+
             if _command.lower() in ['ocr','bcr','chipsync']:
                 globalBXCounter[_globalBX:-1] = np.arange(len(globalBXCounter[_globalBX:-1])) % 3564        
 
             if _command.lower()=='linkreset':
-                _bxSyncEnd = _globalBX + 256
+                _bxSyncEnd = _globalBX + 255
                 if _bxSyncEnd>=N:
                     _bxSyncEnd = N-1
 
                 #replace 256 BX with Idle word values
                 for _fName in dataFiles+formatFiles:
-                    inputValuesDF[_fName].loc[_globalBX:_bxSyncEnd] = [idleValuesDF.loc[_fName].values]*int(_bxSyncEnd - _globalBX)
+                    inputValuesDF[_fName].loc[_globalBX:_bxSyncEnd] = [idleValuesDF[_fName].loc[0].values]*int(_bxSyncEnd - _globalBX + 1)
+
 
         header = globalBXCounter%32
-        np.savetxt(f'{outputDir}/Algorithm_Input_Header.csv', headerValues,fmt='%d', header='HEADER',comments="")
-        np.savetxt(f'{outputDir}/Algorithm_Output_Header.csv', headerValues,fmt='%d', header='HEADER',comments="")
 
-        
+        np.savetxt(f'{outputDir}/Algorithm_Input_Header.csv', header,fmt='%d', header='HEADER',comments="")
+        np.savetxt(f'{outputDir}/Algorithm_Output_Header.csv', header,fmt='%d', header='HEADER',comments="")
+
+
+        # update the idle words in formatter and header of first word with the correct header after counter resets
         for _fName in formatFiles:
-            colNames = inputValuesDF[_fName]
             inputValuesDF[_fName]['NULL'] = header<<11
             inputValuesDF[_fName].loc[:] = inputValuesDF[_fName].apply(correctFormattedHeader,axis=1).tolist()
-            
-            inputValuesDF[_fName] = inputValuesDF[_fName][colNames]
+            inputValuesDF[_fName].drop('NULL',axis=1,inplace=True)
 
         for _fName in dataFiles+formatFiles:
-            df = pd.read_csv(f'{inputDir}/{_fName}',skipinitialspace=True)
-            df.loc[:N].to_csv(f'{outputDir}/{_fName}')
+            inputValuesDF[_fName].to_csv(f'{outputDir}/{_fName}',index=False)
 
     
     #need to replicate these links
-    formatBufferInputLinks=['AddrMap.csv','BC_Charge.csv','BC_TC_map.csv','ChargeQ.csv','MAX16_ADDR.csv','MAX4_ADDR.csv','Mod_Sum.csv','NTCQ.csv','RepeaterQ.csv','Sum.csv','XTC16_9.csv','XTC4_7.csv','XTC4_9.csv']
+    formatBufferInputLinks=['AddrMap.csv','BC_Charge.csv','BC_TC_map.csv','ChargeQ.csv','MAX16_ADDR.csv','MAX4_ADDR.csv','NTCQ.csv','RepeaterQ.csv','Sum.csv','XTC16_9.csv','XTC4_7.csv','XTC4_9.csv']
 
     for _fName in formatBufferInputLinks:
         if not os.path.exists(f'{outputDir}/Formatter_Buffer_Input_{_fName}'):

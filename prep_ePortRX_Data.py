@@ -66,7 +66,7 @@ def produceEportRX_input(inputFile, outputName='ECON_T_ePortRX.txt', configFile=
 
     eportRXData = eportRXData[:N]
 
-    dfFastCommands = pd.DataFrame({'godOrbitNumber':(np.arange(N)/3564).astype(int),'godBucketNumber':(np.arange(N)%3564).astype(int),'command':'IDLE'})
+    dfFastCommands = pd.DataFrame({'godOrbitNumber':(np.arange(N)/3564).astype(int),'godBucketNumber':(np.arange(N)%3564).astype(int),'Command':'IDLE'})
 
     dataCols = [f'DATA_{i}' for i in range(12)]
     synchCols = [f'SYNCH_{i}' for i in range(12)]
@@ -227,7 +227,7 @@ def produceEportRX_input(inputFile, outputName='ECON_T_ePortRX.txt', configFile=
             eportRXData[c] = eportRXData[c].apply(convertToHex)
         
     eportRXData.to_csv(outputName)
-    eportRXData.to_csv(outputName.replace('ePortRX','fastCommands'))
+    dfFastCommands.to_csv(outputName.replace('ePortRX','fastCommands'))
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()

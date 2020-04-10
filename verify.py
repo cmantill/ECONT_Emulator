@@ -50,12 +50,10 @@ def processTree(_tree, geomDF, subdet, layer, useV10=False, jobNumber=0, nEvents
         df['UV'] = list(zip(df.triggercellu, df.triggercellv))
         df['triggercell'] = df.UV.map(triggerCellUVRemap)
 
-    print(df.head())
     df = df.reset_index().merge(tc_remap,left_on='triggercell',right_on='TC_Number',how='left').set_index('entry')
 #    df = df.merge(tc_remap,left_on='triggercell',right_on='TC_Number',how='left',left_index=True,right_index=True)
     df['triggercell'] = df.ECON_TC_Number_PostMux
 
-    print(df.head())
     #set index
     df.set_index(['subdet','zside','layer','wafer','triggercell'],append=True,inplace=True)
     df.sort_index(inplace=True)
@@ -297,10 +295,12 @@ def writeThresAlgoBlock(d_csv):
     CHARGEQ_headers = ["CHARGEQ_%s"%i for i in range(0,48)]
 
     df_out['NTCQ'] = df_passThres.count(axis=1)         #df_passThres has NAN for TC below threshold
-    df_out['SUM']  = encodeList(df.sum(axis=1).round().astype(np.int),0,5,3,asInt=True)                     #Sum over all charges regardless of threshold
-    df_out['MOD_SUM_0']  = encodeList(df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1).round().astype(np.int),0,5,3,asInt=True)      #Sum over all charges of 0-16 TC regardless of threshold
-    df_out['MOD_SUM_1']  = encodeList(df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1).round().astype(np.int),0,5,3,asInt=True)      #Sum over all charges of 16-32 TC regardless of threshold
-    df_out['MOD_SUM_2']  = encodeList(df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int),0,5,3,asInt=True)      #Sum over all charges of 32-48 TC regardless of threshold
+    df_out['SUM_FULL']  = encodeList(df.sum(axis=1).round().astype(np.int),0,5,3,asInt=True)     #Sum over all charges regardless of threshold
+    df_out['SUM_NOT_TRANSMITTED']  = encodeList(df.sum(axis=1).astype(int) - df_passThres.sum(axis=1).astype(int),0,5,3,asInt=True)  #Sum over all charges not transmitted
+
+    # df_out['MOD_SUM_0']  = encodeList(df[['CALQ_%i'%i for i in range(0,16)] ].sum(axis=1).round().astype(np.int),0,5,3,asInt=True)      #Sum over all charges of 0-16 TC regardless of threshold
+    # df_out['MOD_SUM_1']  = encodeList(df[['CALQ_%i'%i for i in range(16,32)]].sum(axis=1).round().astype(np.int),0,5,3,asInt=True)      #Sum over all charges of 16-32 TC regardless of threshold
+    # df_out['MOD_SUM_2']  = encodeList(df[['CALQ_%i'%i for i in range(32,48)]].sum(axis=1).round().astype(np.int),0,5,3,asInt=True)      #Sum over all charges of 32-48 TC regardless of threshold
 
     df_registers = pd.read_csv(d_csv['register_csv'])
     isHDM = df_registers.isHDM.loc[0]
@@ -501,7 +501,7 @@ def writeBestChoice(d_csv):
     df_sorted_index.to_csv(d_csv['bc_address_csv'],index='entry')
 
     df_sorted[df_sorted_index.columns] = df_sorted_index
-    df_sorted['SUM'] = df_wafer['SUM']
+#    df_sorted['SUM'] = df_wafer['SUM']
 
     df_sorted['FRAMEQ'] = df_sorted.apply(formatBestChoiceOutput, args=(d_csv['nTC'],isHDM), axis=1)
     df_sorted['WORDCOUNT'] = (df_sorted.FRAMEQ.str.len()/16).astype(int)
@@ -606,8 +606,6 @@ def simulateIdleWord(d_csv):
     df = pd.DataFrame([CALQ_values],columns=[f'CALQ_{i}' for i in range(48)])
     df.index.name='entry'
     df.to_csv(f'{idleDir}/CALQ_output.csv')
-
-    print('Wrote Data')
 
     #threshold
     threshold_inputcsv ={
@@ -875,7 +873,7 @@ if __name__=='__main__':
     parser.add_option('-v',"--waferv" , type=int, default = 2,dest="waferv" , help="which wafer to write")
     parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
-    parser.add_option('-N', type=int, default = 1 ,dest="Nfiles", help="Limit on number of files to read (-1 is all)")
+    parser.add_option('--Nfiles', type=int, default = 1 ,dest="Nfiles", help="Limit on number of files to read (-1 is all)")
     parser.add_option('--Nevents', type=int, default = 50 ,dest="Nevents", help="Limit on number of events to read per file (-1 is all)")
     parser.add_option('--jobSplit', type="string", default = "1/1" ,dest="jobSplit", help="Split of the input root files")
     parser.add_option("--skipInput", default = False, action='store_true',dest="skipInput", help="skip the read in step, only run algorithms on csv already there")

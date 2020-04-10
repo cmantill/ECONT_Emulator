@@ -4,15 +4,16 @@ from encode import encode
 def formatThresholdOutput(row,debug=False):
 
     NTCQ=row['NTCQ']
-    SUM =row['SUM']
+    SUM_FULL =row['SUM_FULL']
+    SUM_NOT_TRANSMITTED =row['SUM_NOT_TRANSMITTED']
     ADD_MAP  = list(row['ADD_MAP'])
 
     CHARGEQ = np.array(list(row['CHARGEQ']))
     CHARGEQ=CHARGEQ[CHARGEQ>0]      ## remove zeros
 
-    MOD_SUM_0 = row['MOD_SUM_0']
-    MOD_SUM_1 = row['MOD_SUM_1']
-    MOD_SUM_2 = row['MOD_SUM_2']    
+    # MOD_SUM_0 = row['MOD_SUM_0']
+    # MOD_SUM_1 = row['MOD_SUM_1']
+    # MOD_SUM_2 = row['MOD_SUM_2']    
     #header = format(BC, '#0%ib'%(15))[-5:]
     header =  '00000'           ## don't assign BC for now    
 
@@ -24,7 +25,8 @@ def formatThresholdOutput(row,debug=False):
     else:
         dataType='010'
 
-    modSumData = format(SUM, '#0%ib'%(10))[2:]
+    modSumFull = format(SUM_FULL, '#0%ib'%(10))[2:]
+    modSumNotTransmitted = format(SUM_NOT_TRANSMITTED, '#0%ib'%(10))[2:]
     extraBit=''
     if NTCQ==0:
         nChannelData=''
@@ -49,7 +51,7 @@ def formatThresholdOutput(row,debug=False):
         for x in CHARGEQ:
             ChargeData += format(x, '#0%ib'%(9))[2:]
 
-    formattedData = header + dataType + modSumData + extraBit + nChannelData + AddressMapData + ChargeData
+    formattedData = header + dataType + modSumNotTransmitted + extraBit + nChannelData + AddressMapData + ChargeData
     if len(formattedData)%16==0:
         nPadBits=0
         paddedData = formattedData
@@ -60,7 +62,7 @@ def formatThresholdOutput(row,debug=False):
     if not debug:
         return paddedData
     else:
-        return [header, dataType , modSumData , extraBit ,nChannelData , len(AddressMapData) , len(ChargeData)]
+        return [header, dataType , modSumNotTransmitted, extraBit ,nChannelData , len(AddressMapData) , len(ChargeData)]
 
 
 
@@ -70,11 +72,12 @@ def formatThresholdTruncatedOutput(row):
 
     dataType_Truncated = '110'
 
-    SUM =row['SUM']
-    modSumData = encode(SUM,0,5,3)
+    SUM_FULL =row['SUM_FULL']
+    modSumFull = format(SUM_FULL, '#0%ib'%(10))[2:]
+#    modSumData = encode(SUM_FULL,0,5,3)
 
-    formattedData_Truncated = header + dataType_Truncated + modSumData
-        
+    formattedData_Truncated = header + dataType_Truncated + modSumFull
+
     return formattedData_Truncated
 
 
@@ -89,7 +92,7 @@ def formatBestChoiceOutput(row, nTC = 1, isHDM=True,debug=False):
     ADD_MAP = list(row[[f'BC_Address_{i}' for i in range(48)]])
     CHARGEQ = list(row[[f'BC_Charge_{i}' for i in range(48)]])
 
-    SUM =row['SUM']
+    SUM_NOT_TRANSMITTED = encode(sum(CHARGEQ[nTC:]),0,5,3,asInt=True)
 
     sel_q = CHARGEQ[:nTC]
     sel_add = ADD_MAP[:nTC]
@@ -104,7 +107,7 @@ def formatBestChoiceOutput(row, nTC = 1, isHDM=True,debug=False):
 
     #header = format(BC, '#0%ib'%(15))[-5:]
     header =  '00000'           ## don't assign BC for now    
-    modSumData = format(SUM, '#010b')[2:]
+    modSumData = format(SUM_NOT_TRANSMITTED, '#010b')[2:]
 
     if nTC<8:
         nChannelData=format(nTC, '#0%ib'%(3+2))[2:]

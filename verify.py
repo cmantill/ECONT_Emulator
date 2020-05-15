@@ -2,6 +2,9 @@ import uproot
 import optparse
 import os
 
+import re
+import glob
+
 import datetime
 import pandas as pd
 import numpy as np
@@ -26,17 +29,24 @@ tc_remap = pd.read_csv("LDM_TC_Mapping.csv")[['TC_Number','ECON_TC_Number_PostMu
 def droppedBits(isHDM):
     return 3 if isHDM else 1
 
-def processTree(_tree, geomDF, subdet, layer, useV10=False, jobNumber=0, nEvents=-1):
+def processTree(_tree, geomDF, subdet, layer, useV10=False, jobNumber=0, nEvents=-1, nStart=-1):
     #load dataframe
     print('load dataframe')
     if nEvents==-1:
-        nEvents=None
+        nStop=None
+        nStart=0
+    else:
+        if nStart==-1:
+            nStart=0
+            nStop=nEvents
+        else:
+            nStop = nEvents + nStart
     if useV10:
-        df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_waferu','tc_waferv','tc_cellu','tc_cellv','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystop=nEvents)
+        df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_waferu','tc_waferv','tc_cellu','tc_cellv','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystart=nStart,entrystop=nStop)
         df.columns = ['subdet','zside','layer','waferu','waferv','triggercellu','triggercellv','uncompressedCharge','compressedCharge','data','mipPt']
 
     else:
-        df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystop=nEvents)
+        df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystart=nStart,entrystop=nStop)
         df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt']
     df.reset_index('subentry',drop=True,inplace=True)
 
@@ -116,7 +126,7 @@ def processTree(_tree, geomDF, subdet, layer, useV10=False, jobNumber=0, nEvents
 
 def getGeomDF_V9():
     geomName = "root://cmseos.fnal.gov//store/user/dnoonan/HGCAL_Concentrator/triggerGeomV9.root"
-    geomTree = uproot.open(geomName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))["hgcaltriggergeomtester/TreeTriggerCells"]
+    geomTree = uproot.open(geomName,xrootdsource=dict(chunkbytes=250*1024**2, limitbytes=250*1024**2))["hgcaltriggergeomtester/TreeTriggerCells"]
     
     tcmapCSVname = 'TC_ELINK_MAP.csv'
     df_tcmap = pd.read_csv(tcmapCSVname)
@@ -199,7 +209,7 @@ def remapTriggerCellNumbers(x):
 
 def getGeomDF_V10():
     geomName = "root://cmseos.fnal.gov//store/user/dnoonan/HGCAL_Concentrator/triggerGeomV10-2.root"
-    geomTree = uproot.open(geomName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))["hgcaltriggergeomtester/TreeTriggerCells"]
+    geomTree = uproot.open(geomName,xrootdsource=dict(chunkbytes=250*1024**2, limitbytes=250*1024**2))["hgcaltriggergeomtester/TreeTriggerCells"]
     
     tcmapCSVname = 'TC_ELINK_MAP.csv'
     df_tcmap = pd.read_csv(tcmapCSVname)
@@ -600,8 +610,12 @@ def simulateIdleWord(d_csv):
     df.index.name='entry'
     df.to_csv(f'{idleDir}/F2F_output.csv')
 
+
     #calibration
-    calibVals = pd.read_csv(d_csv['calib_csv']).loc[0].values
+    calibVals = np.ones(48)
+    calibDF = pd.read_csv(d_csv['calib_csv'],header=None).values
+    for i in range(len(calibDF[0])):
+        calibVals[int(calibDF[0][i])] = calibDF[1][i]
     CALQ_values = (F2F_values*calibVals).astype(int)
     df = pd.DataFrame([CALQ_values],columns=[f'CALQ_{i}' for i in range(48)])
     df.index.name='entry'
@@ -655,15 +669,23 @@ def simulateIdleWord(d_csv):
     writeRepeaterAlgoBlock(repeater_inputcsv)
 
 
-def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, useV10=False, appendFile=False, jobInfo=""):
+def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, chunkSize=10000, useV10=False, appendFile=False, jobInfo=""):
 
-    _tree = uproot.open(fName,xrootdsource=dict(chunkbytes=1024**3, limitbytes=1024**3))['hgcalTriggerNtuplizer/HGCalTriggerNtuple']
+    _tree = uproot.open(fName,xrootdsource=dict(chunkbytes=250*1024**2, limitbytes=250*1024**2))['hgcalTriggerNtuplizer/HGCalTriggerNtuple']
 
     print(f'loaded tree {fName}')
-    # print(_tree.numentries)
+
+    if nEvents==-1:
+        nEventsTot = _tree.numentries
+    else:
+        nEventsTot = nEvents
+    
+    nJobs = int(np.ceil(nEventsTot/chunkSize))
+    print(f'{nEventsTot} events in {nJobs} chunks')
+
     # writeMode='a' if appendFile else 'w'
     # print (writeMode)
-
+    
     numString = ''
     for x in fName.split('.root')[0][::-1]:
         if x.isdigit():
@@ -676,22 +698,30 @@ def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, useV
         
     print(f'file is job number {jobNumber}')
 
-    print ('process tree')
-    Layer_df =   processTree(_tree,geomDF,subdet,layer,useV10,jobNumber,nEvents)
-    del _tree
-    gc.collect()
+    for j in range(nJobs):
+        _appendFile = appendFile or j>0
 
-    waferList = Layer_df.wafer.unique()
-    if not wafer==-1:
-        waferList = [wafer]
-    print ('Writing Inputs')
+        print ('process tree')
+        Layer_df =   processTree(_tree,geomDF,subdet,layer,useV10,jobNumber,nEvents=min(nEventsTot, chunkSize), nStart=chunkSize*j)
 
-    writeInputCSV(odir,  Layer_df, subdet,layer,waferList, useV10, appendFile, jobInfo)
+        waferList = Layer_df.wafer.unique()
+
+        if not wafer==-1:
+            waferList = [wafer]
+        print ('Writing Inputs')
+
+        writeInputCSV(odir,  Layer_df, subdet,layer,waferList, useV10, _appendFile, jobInfo)
+
+        del Layer_df
+        gc.collect()
 
     if not appendFile:
         print ('Writing Registers')
         writeRegisters( odir,  geomDF, subdet,layer,waferList,useV10)
             
+    del _tree
+    gc.collect()
+
     return waferList
 
 def runAlgos(subdet, layer, waferList, odir, useV10, jobInfo=""):
@@ -841,8 +871,9 @@ def main(opt,args):
             print(i, fName)
             wafer = opt.wafer
             if opt.useV10:
-                wafer = opt.waferu*100 + opt.waferv
-            waferList = processNtupleInputs(fName, geomDF, subdet, layer, wafer, opt.odir, opt.Nevents, useV10=opt.useV10, appendFile=i>0, jobInfo=jobSplitText)
+                if not wafer==-1:
+                    wafer = opt.waferu*100 + opt.waferv
+            waferList = processNtupleInputs(fName, geomDF, subdet, layer, wafer, opt.odir, opt.Nevents, opt.chunkSize, useV10=opt.useV10, appendFile=i>0, jobInfo=jobSplitText)
         print(waferList)
     else:
         if not opt.wafer==-1:
@@ -850,13 +881,34 @@ def main(opt,args):
             if opt.useV10:
                 waferList = [100*opt.waferu + opt.waferv]
         else:
+            _dirList = glob.glob(f'{opt.odir}/wafer*')
+            waferList = []
             if opt.useV10:
-                df_geom = getGeomDF_V9().reset_index()
+                listU = []
+                listV = []
+                x = re.compile('\w+/wafer_D(\d+)L(\d+)U(-?\d+)V(-?\d+)')                    
+                for _dirName in _dirList:
+                    match = x.match(_dirName)
+                    if not match is None:
+                        listU.append(int(match.groups()[2]))
+                        listV.append(int(match.groups()[3]))
+                for i in range(len(listU)):
+                    waferList.append(100*listU[i] + listV[i])
             else:
-                df_geom = getGeomDF_V10().reset_index()
-            df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & (df_geom.zside==1) ]
+                x = re.compile('\w+/wafer_D(\d+)L(\d+)W(-?\d+)')
+                for _dirName in _dirList:
+                    match = x.match(_dirName)
+                    if not match is None:
+                        waferList.append(int(match.groups()[2]))
 
-            waferList = df_geom.wafer.unique()
+            #     df_geom = getGeomDF_V10().reset_index()
+            # else:
+            #     df_geom = getGeomDF_V9().reset_index()
+            # df_geom = df_geom[(df_geom.subdet==subdet) & (df_geom.layer==layer) & (df_geom.zside==1) ]
+            # print(df_geom)
+            # waferList = df_geom.wafer.unique()
+
+        print(waferList)
     if not opt.skipAlgo:
         runAlgos(subdet, layer, waferList, opt.odir, useV10=opt.useV10, jobInfo=jobSplitText)
 
@@ -875,6 +927,7 @@ if __name__=='__main__':
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
     parser.add_option('--Nfiles', type=int, default = 1 ,dest="Nfiles", help="Limit on number of files to read (-1 is all)")
     parser.add_option('--Nevents', type=int, default = 50 ,dest="Nevents", help="Limit on number of events to read per file (-1 is all)")
+    parser.add_option('--chunkSize', type=int, default = 100000 ,dest="chunkSize", help="Number of events to load from root file in a single chunk")
     parser.add_option('--jobSplit', type="string", default = "1/1" ,dest="jobSplit", help="Split of the input root files")
     parser.add_option("--skipInput", default = False, action='store_true',dest="skipInput", help="skip the read in step, only run algorithms on csv already there")
     parser.add_option("--skipAlgo", default = False, action='store_true',dest="skipAlgo", help="skip the algorithm step, only create the input csv files")

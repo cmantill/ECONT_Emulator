@@ -1,5 +1,5 @@
 universe = vanilla
-Executable = runVerificationCondor.sh
+Executable = runVerificationCondor2.sh
 
 should_transfer_files = YES
 WhenToTransferOutput  = ON_EXIT
@@ -7,7 +7,7 @@ notification = never
 
 X=$(step)+1
 
-Transfer_Input_Files = verify.py, format.py, bestchoice.py, linkAllocation.py, encode.py, supertriggercell.py, TC_ELINK_MAP.csv
+Transfer_Input_Files = verify.py, format.py, bestchoice.py, linkAllocation.py, encode.py, supertriggercell.py, TC_ELINK_MAP.csv, LDM_TC_Mapping.csv
 
 Output = condor/verification_$(cluster)_$(process).stdout
 Error  = condor/verification_$(cluster)_$(process).stderr
@@ -15,12 +15,44 @@ Log    = condor/verification_$(cluster)_$(process).condor
 
 +RequestMemory=4000
 
-U=$(step)/10
-X=$INT(U)*2 + 1
-Y=$(step)%10 + 1
-Arguments = 3 $INT(X) $INT(Y) 10
-Queue 140
-X=$INT(U) + 29
-Y=$(step)%10 + 1
-Arguments = 4 $INT(X) $INT(Y) 10
-Queue 240
+Arguments = $INT(X) 20 3 1
+Queue 20
+Arguments = $INT(X) 20 5 1
+Queue 20
+Arguments = $INT(X) 20 7 1
+Queue 20
+Arguments = $INT(X) 20 9 1
+Queue 20
+Arguments = $INT(X) 20 11 1
+Queue 20
+Arguments = $INT(X) 20 27 1
+Queue 20
+
+Arguments = $INT(X) 20 3 3
+Queue 20
+Arguments = $INT(X) 20 5 3
+Queue 20
+Arguments = $INT(X) 20 7 3
+Queue 20
+Arguments = $INT(X) 20 9 3
+Queue 20
+Arguments = $INT(X) 20 11 3
+Queue 20
+Arguments = $INT(X) 20 27 3
+Queue 20
+
+# U=$(step)/10
+# X=$INT(U)*2 + 1
+# Y=$(step)%10 + 1
+# Arguments = 3 $INT(X) $INT(Y) 10
+# Queue 140
+
+# U=$(step)/10
+# X=$INT(U)*2 + 1
+# Y=$(step)%10 + 1
+# Arguments = 3 $INT(X) $INT(Y) 10
+# Queue 140
+# X=$INT(U) + 29
+# Y=$(step)%10 + 1
+# Arguments = 4 $INT(X) $INT(Y) 10
+# Queue 240

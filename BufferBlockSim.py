@@ -16,7 +16,12 @@ def alterCSVFiles(outputDir):
                 sources.write(line.replace(',',', '))
 
 
-def getBufferOutputs(df, nOutputLinks, outputDir, algoType = "ThresholdSum", nBitsPerLink=32, T1_Latency=12 , T2_Latency = 6, T3=8):
+def getBufferOutputs(inputFileName, nOutputLinks, outputDir, algoType = "ThresholdSum", nBitsPerLink=32, T1_Latency=12 , T2_Latency = 6, T3=8, saveData=True, saveStatus=True, computeStats=False, append=False, N=-1):
+
+    df = pd.read_csv(inputFileName,dtype=int,skipinitialspace=True)
+
+    if not N==-1:
+        df = df.loc[:N-1]
 
     fixedLatency=True
     if algoType=='ThresholdSum':
@@ -31,7 +36,7 @@ def getBufferOutputs(df, nOutputLinks, outputDir, algoType = "ThresholdSum", nBi
     totalData = []
 
     for BX in df.index:        
-        currentBXData = df.loc[BX][[f'WORD_{i}' for i in range(25)]].values
+        currentBXData = df.loc[BX][[f'WORD_{i}' for i in range(28)]].values
         if not fixedLatency:
             truncatedData = df.loc[BX].FRAMEQ_TRUNC
             NBXc = df.loc[BX].wordCount
@@ -54,10 +59,10 @@ def getBufferOutputs(df, nOutputLinks, outputDir, algoType = "ThresholdSum", nBi
             BufferContents[writePointer] = truncatedData + 2**8  #add extra bit switch data type of truncated data
             cond2 = True
         elif ((Nbuf + NBXc) <= T1) and (Nbuf > T2) and (NBXc > T3):
-            BufferContents[writePointer:writePointer+25] = currentBXData
+            BufferContents[writePointer:writePointer+28] = currentBXData
             cond3 = True
         elif ((Nbuf + NBXc) <= T1) and (Nbuf <= T2):
-            BufferContents[writePointer:writePointer+25] = currentBXData
+            BufferContents[writePointer:writePointer+28] = currentBXData
             cond4 = True
         else:
             print("ERROR")
@@ -82,24 +87,37 @@ def getBufferOutputs(df, nOutputLinks, outputDir, algoType = "ThresholdSum", nBi
     wordColumns = [f'WORD_{i}' for i in range(2*nOutputLinks)]
     statusColumns = ['Truncated', 'Nbuf', 'NBXc', 'Cond1', 'Cond2','Cond3','Cond4']
     totalData = pd.DataFrame(data = np.array(totalData), columns=wordColumns + statusColumns, index=df.index)
-    totalData[wordColumns].to_csv(f'{outputDir}/Buffers/Buffer_Output_{algoType}_{nOutputLinks}Links.csv',index=False)
-    totalData[statusColumns].to_csv(f'{outputDir}/Buffers/Buffer_Status_{algoType}_{nOutputLinks}Links.csv',index=False)
 
-    return
+    if computeStats:
+        totalData['wordCount'] = df.wordCount
+        statusColumns.append('wordCount')
+
+    if saveData:
+        totalData[wordColumns].to_csv(f'{outputDir}/Buffers/Buffer_Output_{algoType}_{nOutputLinks}Links.csv',index=False)
+    if saveStatus:
+        totalData[statusColumns].to_csv(f'{outputDir}/Buffers/Buffer_Status_{algoType}_{nOutputLinks}Links.csv',index=False)
+
+
+    idleCount = []
+    if computeStats:
+        IdleVal = (np.arange(len(totalData),dtype=int)%32)<<11
+        #totalData['IDLE'] = np.arange(len(totalData),dtype=int)<<11
+        idleCount = []
+        for i in range(2*nOutputLinks):
+            idleCount.append((totalData[f'WORD_{i}']==IdleVal).sum())
+        
+        print(idleCount)
+    return 
 
 
 def simBuffer(directory):
-    inputFileName = f'{directory}/Formatter_Output_ThresholdSum.csv'
-    dfTS = pd.read_csv(inputFileName,dtype=int,skipinitialspace=True)
+    inputFileName_TS = f'{directory}/Formatter_Output_ThresholdSum.csv'
 
-    inputFileName = f'{directory}/Formatter_Output_BC.csv'
-    dfBC = pd.read_csv(inputFileName,dtype=int,skipinitialspace=True)
-    inputFileName = f'{directory}/Formatter_Output_STC.csv'
-    dfSTC = pd.read_csv(inputFileName,dtype=int,skipinitialspace=True)
+    inputFileName_BC = f'{directory}/Formatter_Output_BC.csv'
 
-    inputFileName = f'{directory}/Formatter_Output_RPT.csv'
-    dfRPT = pd.read_csv(inputFileName,dtype=int,skipinitialspace=True)
+    inputFileName_STC = f'{directory}/Formatter_Output_STC.csv'
 
+    inputFileName_RPT = f'{directory}/Formatter_Output_RPT.csv'
 
 
     maxLatency = 12

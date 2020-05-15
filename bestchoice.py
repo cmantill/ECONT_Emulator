@@ -50,11 +50,7 @@ def merger(ar, adr):
         r = p
     return ar, adr
 
-# TODO: cleaning
-def batcher_sort(row):
-    ar = np.array(row)
-    N = int(ar.shape[0])
-    adr = np.array(range(0, N))
+def hardcoded_mergers(ar, adr):
     # sort 4 sub arrays
     subars = []
     subadrs = []
@@ -92,7 +88,18 @@ def batcher_sort(row):
             merger_adrs[2][i*2+m] = merger_adrs[m][i]
     # Second stage mergers
     merger_ars[2], merger_adrs[2] = merger(merger_ars[2], merger_adrs[2])
-    return pd.Series(merger_adrs[2])#, merger_ars[2]
+    return merger_ars[2], merger_adrs[2]
+
+# TODO: cleaning
+def batcher_sort(row, mergers=False):
+    ar = np.array(row)
+    N = int(ar.shape[0])
+    adr = np.array(range(0, N))
+    if not mergers:
+        sorted_ar, sorted_adr = sorter(ar, adr)
+    else:
+        sorted_ar, sorted_adr = hardcoded_mergers(ar, adr)
+    return pd.Series(sorted_adr)#, merger_ars[2]
 
 
 def main(input_file, output_charge_file, output_address_file):
@@ -126,5 +133,6 @@ if __name__=='__main__':
     parser.add_option("--input", type="string", dest="input_file", help="input pattern file")
     parser.add_option("--output_charge", type="string", dest="output_charge_file", help="output charges file")
     parser.add_option("--output_address", type="string", dest="output_address_file", help="output address file")
+    parser.add_option("--mergers", action="store_true", default=False, dest="mergers", help="Batcher sort with hardcoded mergers")
     (opt, args) = parser.parse_args()
     main(opt.input_file, opt.output_charge_file, opt.output_address_file)

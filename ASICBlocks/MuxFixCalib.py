@@ -1,13 +1,13 @@
 import pandas as pd
 import numpy as np
 
-from encode import decode
+from Utils.encode import decode
 decodeV = np.vectorize(decode)
 
 import pickle
 
 def getMuxRegisters(tpgNtupleMapping=False):
-    tc_remap = pd.read_csv("LDM_TC_Mapping.csv")[['TC_Number','ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']]
+    tc_remap = pd.read_csv("Utils/LDM_TC_Mapping.csv")[['TC_Number','ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']]
     
     muxRegisters = tc_remap[['ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']].values
     if tpgNtupleMapping:
@@ -36,10 +36,10 @@ def FloatToFix(df_Mux_out, isHDM):
 def getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion):
     
     if geomVersion in ['v10','v11']:
-        with open('geomDF_v10.pkl','rb') as geomFile:
+        with open('Utils/geomDF_v10.pkl','rb') as geomFile:
             geomDF = pickle.load(geomFile).loc[subdet,layer,wafer]
     else:
-        with open('geomDF_v9.pkl','rb') as geomFile:
+        with open('Utils/geomDF_v9.pkl','rb') as geomFile:
             geomDF = pickle.load(geomFile).loc[subdet,layer,wafer]
         
     return (geomDF.corrFactor_finite*2**11).values.astype(int), geomDF.threshold_ADC.values

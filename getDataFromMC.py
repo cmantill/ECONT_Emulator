@@ -6,12 +6,12 @@ import pandas as pd
 import numpy as np
 import time
 
-from encode import encode, decode
+from Utils.encode import encode, decode
 
 from subprocess import Popen,PIPE
 import gc
 
-from getGeom import getGeomDF_V9, getGeomDF_V10, triggerCellUVRemap
+from Utils.getGeom import getGeomDF_V9, getGeomDF_V10, triggerCellUVRemap
 
 encodeList = np.vectorize(encode)
 

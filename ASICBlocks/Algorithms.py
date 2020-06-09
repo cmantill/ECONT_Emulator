@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from encode import encode, decode
+from Utils.encode import encode, decode
 
 encodeV = np.vectorize(encode)
 decodeV = np.vectorize(decode)
@@ -37,7 +37,7 @@ def ThresholdSum(df_CALQ, THRESHV_Registers, DropLSB):
 
 
 
-from bestchoice import sort, batcher_sort
+from .bestchoice import sort, batcher_sort
 
 def BestChoice(df_CALQ, DropLSB):
     df_in = pd.DataFrame(df_CALQ.values>>DropLSB,columns=df_CALQ.columns, index=df_CALQ.index)
@@ -54,7 +54,7 @@ def BestChoice(df_CALQ, DropLSB):
 
 
     
-from supertriggercell import supertriggercell_2x2, supertriggercell_4x4
+from .supertriggercell import supertriggercell_2x2, supertriggercell_4x4
 
 def SuperTriggerCell(df_CALQ):
 

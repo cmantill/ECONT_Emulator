@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from encode import encode
+from Utils.encode import encode
 
 def splitToWords(row, N=16,totalWords=28):
     fullData = row['FullDataString']
@@ -170,7 +170,7 @@ def formatBestChoiceOutput(row, nTC = 1, debug=False):
     else:
         return [header, modSumData , AddressMapData , ChargeData]
 
-from linkAllocation import tcPerLink
+from Utils.linkAllocation import tcPerLink
 
 def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord):
     df_in = pd.merge(df_BestChoice, df_BX_CNT, left_index=True, right_index=True)

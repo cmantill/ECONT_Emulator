@@ -15,7 +15,7 @@ from Utils.getGeom import getGeomDF_V9, getGeomDF_V10, triggerCellUVRemap
 
 encodeList = np.vectorize(encode)
 
-tc_remap = pd.read_csv("LDM_TC_Mapping.csv")[['TC_Number','ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']]
+tc_remap = pd.read_csv("Utils/LDM_TC_Mapping.csv")[['TC_Number','ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']]
 
 def droppedBits(isHDM):
     return 3 if isHDM else 1

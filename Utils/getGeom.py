@@ -7,7 +7,7 @@ def getGeomDF_V9():
     geomName = "root://cmseos.fnal.gov//store/user/dnoonan/HGCAL_Concentrator/triggerGeomV9.root"
     geomTree = uproot.open(geomName,xrootdsource=dict(chunkbytes=250*1024**2, limitbytes=250*1024**2))["hgcaltriggergeomtester/TreeTriggerCells"]
     
-    tcmapCSVname = 'TC_ELINK_MAP.csv'
+    tcmapCSVname = 'Utils/TC_ELINK_MAP.csv'
     df_tcmap = pd.read_csv(tcmapCSVname)
     
     geomDF = geomTree.pandas.df(['subdet','zside','layer','wafer','triggercell','x','y','z','c_n'])
@@ -90,7 +90,7 @@ def getGeomDF_V10():
     geomName = "root://cmseos.fnal.gov//store/user/dnoonan/HGCAL_Concentrator/triggerGeomV10-2.root"
     geomTree = uproot.open(geomName,xrootdsource=dict(chunkbytes=250*1024**2, limitbytes=250*1024**2))["hgcaltriggergeomtester/TreeTriggerCells"]
     
-    tcmapCSVname = 'TC_ELINK_MAP.csv'
+    tcmapCSVname = 'Utils/TC_ELINK_MAP.csv'
     df_tcmap = pd.read_csv(tcmapCSVname)
     
     geomDF = geomTree.pandas.df(['subdet','zside','layer','waferu','waferv','triggercellu','triggercellv','x','y','z','c_n'])

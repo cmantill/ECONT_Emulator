@@ -20,7 +20,7 @@ from ASICBlocks.Formatter import Format_Threshold_Sum, Format_BestChoice, Format
 from ASICBlocks.BufferBlock import Buffer
 
 
-def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, SumTCNotTransmitted):
+def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Sum):
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
     df_ePortRxDataGroup, df_BX_CNT = loadEportRXData(inputDir)
 
@@ -68,7 +68,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, SumTCN
     pd.DataFrame([[TxSyncWord]], columns=['TxSyncWord'],index=df_CALQ.index).to_csv(f'{outputDir}/TxSyncWord.csv', index=True)
     pd.DataFrame([[EPORTTX_NUMEN]], columns=['EPORTTX_NUMEN'],index=df_CALQ.index).to_csv(f'{outputDir}/EPORTTX_NUMEN.csv', index=True)
     pd.DataFrame([[STC_TYPE]], columns=['STC_TYPE'],index=df_CALQ.index).to_csv(f'{outputDir}/STC_TYPE.csv', index=True)
-    pd.DataFrame([[SumTCNotTransmitted]], columns=['SumTCNotTransmitted'],index=df_CALQ.index).to_csv(f'{outputDir}/SumTCNotTransmitted.csv', index=True)
+    pd.DataFrame([[Use_Sum]], columns=['Use_Sum'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=True)
 
 
 
@@ -83,7 +83,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, SumTCN
 
 
 
-    df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, SumTCNotTransmitted)
+    df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum)
     df_BufferOutput_TS  = Buffer(df_Format_TS,  EPORTTX_NUMEN, EPORTTX_NUMEN*12*2, EPORTTX_NUMEN*12*2-25, 25)
     del df_Threshold_Sum
     df_Format_TS.to_csv(f'{outputDir}/Format_TS.csv',index=True)
@@ -91,7 +91,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, SumTCN
     del df_Format_TS
     del df_BufferOutput_TS
 
-    df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, SumTCNotTransmitted)
+    df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum)
     df_BufferOutput_BC  = Buffer(df_Format_BC,  EPORTTX_NUMEN, EPORTTX_NUMEN*12*2, EPORTTX_NUMEN*12*2-25, 25)
     del df_BestChoice
     df_Format_BC.to_csv(f'{outputDir}/Format_BC.csv',index=True)
@@ -126,7 +126,7 @@ if __name__=='__main__':
     parser.add_argument('--STC', '--STC_Type', dest="STC_Type", default=-1, type=int, help='STC Type to use, if -1, STC_4_9 for HDM, STC_16_9 for LDM')
     parser.add_argument('--TxSyncWord', dest="Tx_Sync_Word", default='01100110011', help='11-bit Sync word to use for empty words')
     parser.add_argument('--DropLSB', dest="nDropBits", default=-1, type=int, help='Number of LSB to drop when encoding, if -1 HDM will use 3, LDM will use 1')
-    parser.add_argument('--SumTCNotTransmitted', dest="SumTCNotTransmitted", default=False, type=bool, action="store_true", help='Send only sum of not transmitted TC in module sum for TS and BC algorithms')
+    parser.add_argument('--UseSum', dest="Use_Sum", default=False, type=bool, action="store_true", help='Send only sum of all TC in module sum for TS and BC algorithms instead of sum of only TC not transmitted')
 
     args = parser.parse_args()
     

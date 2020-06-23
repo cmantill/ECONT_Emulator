@@ -12,7 +12,7 @@ def splitToWords(row, N=16,totalWords=28):
 
     return words
 
-def formatThresholdOutput(row,TxSynchWord=0, SumTCNotTransmitted=False, debug=False):
+def formatThresholdOutput(row,TxSynchWord=0, Use_Sum=False, debug=False):
 
     SUM_FULL =row['SUM']
     SUM_NOT_TRANSMITTED =row['SUMNOTTRANSMITTED']
@@ -34,10 +34,10 @@ def formatThresholdOutput(row,TxSynchWord=0, SumTCNotTransmitted=False, debug=Fa
     else:
         dataType='010'
 
-    if SumTCNotTransmitted:
-        modSumData = format(SUM_NOT_TRANSMITTED, '#010b')[2:]
-    else
+    if Use_Sum:
         modSumData = format(SUM_FULL, '#010b')[2:]
+    else:
+        modSumData = format(SUM_NOT_TRANSMITTED, '#010b')[2:]
 
     extraBit=''
     if NTCQ==0:
@@ -90,11 +90,11 @@ def formatThresholdTruncatedOutput(row):
     return int(formattedData_Truncated,2)
 
 
-def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, SumTCNotTransmitted):
+def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum):
 
     df_in = pd.merge(df_Threshold_Sum, df_BX_CNT, left_index=True, right_index=True)
 
-    df_Format = pd.DataFrame(df_in.apply(formatThresholdOutput, SumTCNotTransmitted=SumTCNotTransmitted, axis=1).values,columns=['FullDataString'],index=df_in.index)
+    df_Format = pd.DataFrame(df_in.apply(formatThresholdOutput, Use_Sum=Use_Sum, axis=1).values,columns=['FullDataString'],index=df_in.index)
 
     df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
 
@@ -109,7 +109,7 @@ def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, SumTCNotTransm
     return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated']]
 
 
-def formatBestChoiceOutput(row, nTC = 1, SumTCNotTransmitted=False, debug=False):
+def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
 
     nExp = 4
     nMant = 3
@@ -136,10 +136,10 @@ def formatBestChoiceOutput(row, nTC = 1, SumTCNotTransmitted=False, debug=False)
     bx_cnt = row['BX_CNT']
     header =  format(bx_cnt, '#0%ib'%(7))[2:]
 
-    if SumTCNotTransmitted:
-        modSumData = format(SUM_NOT_TRANSMITTED, '#010b')[2:]
-    else
+    if Use_Sum:
         modSumData = format(SUM, '#010b')[2:]
+    else
+        modSumData = format(SUM_NOT_TRANSMITTED, '#010b')[2:]
 
     if nTC<8:
         nChannelData=format(nTC, '#0%ib'%(3+2))[2:]
@@ -179,10 +179,10 @@ def formatBestChoiceOutput(row, nTC = 1, SumTCNotTransmitted=False, debug=False)
 
 from Utils.linkAllocation import tcPerLink
 
-def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, SumTCNotTransmitted):
+def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum):
     df_in = pd.merge(df_BestChoice, df_BX_CNT, left_index=True, right_index=True)
 
-    df_Format = pd.DataFrame(df_in.apply(formatBestChoiceOutput, nTC=tcPerLink[EPORTTX_NUMEN], SumTCNotTransmitted=SumTCNotTransmitted, axis=1).values,columns=['FullDataString'],index=df_in.index)
+    df_Format = pd.DataFrame(df_in.apply(formatBestChoiceOutput, nTC=tcPerLink[EPORTTX_NUMEN], Use_Sum=Use_Sum, axis=1).values,columns=['FullDataString'],index=df_in.index)
 
     df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
 

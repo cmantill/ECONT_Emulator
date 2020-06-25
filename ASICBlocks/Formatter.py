@@ -138,7 +138,7 @@ def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
 
     if Use_Sum:
         modSumData = format(SUM, '#010b')[2:]
-    else
+    else:
         modSumData = format(SUM_NOT_TRANSMITTED, '#010b')[2:]
 
     if nTC<8:

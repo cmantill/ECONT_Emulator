@@ -191,11 +191,12 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
         waferInput = pd.DataFrame(index=df.entry.unique(),columns=EPORTRX_headers)
         waferInput.index.name='entry'
         waferInput[EPORTRX_headers] = df_out.loc[_wafer][EPORTRX_headers]
-        
-        waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna("0000000000000000000000000000")
+
+        waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna(0)
+        # waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna("0000000000000000000000000000")
         waferInput.fillna(0,inplace=True)
 
-        waferInput.to_csv(f"{waferDir}/EPORTRX_output{jobInfo}.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
+        waferInput.astype(int).to_csv(f"{waferDir}/EPORTRX_output{jobInfo}.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
 
         isHDM = df[df.wafer==_wafer].head().isHDM.any()
 

@@ -20,32 +20,39 @@ from ASICBlocks.Formatter import Format_Threshold_Sum, Format_BestChoice, Format
 from ASICBlocks.BufferBlock import Buffer
 
 
-def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Sum):
+def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Sum, StopAtAlgoBlock):
+    if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
     df_ePortRxDataGroup, df_BX_CNT = loadEportRXData(inputDir)
 
     if outputDir is None:
         outputDir = inputDir
 
-    df_ePortRxDataGroup.to_csv(f'{outputDir}/ePortRxDataGroup.csv',index=True)
-    df_BX_CNT.to_csv(f'{outputDir}/BX_CNT.csv',index=True)
+    if not os.path.exists(outputDir):
+        os.mkdir(outputDir)
 
     columns = [f'ePortRxDataGroup_{i}' for i in range(12)]
     df_Mux_in = splitEportRXData(df_ePortRxDataGroup[columns])
-    del df_ePortRxDataGroup
     Mux_Select = getMuxRegisters()
     df_Mux_out = Mux(df_Mux_in, Mux_Select)
     df_F2F = FloatToFix(df_Mux_out, isHDM)
     CALVALUE_Registers, THRESHV_Registers = getCalibrationRegisters_Thresholds(2,33,901,'v10')
     df_CALQ = Calibrate(df_F2F, CALVALUE_Registers)
 
+    df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=True)
+
+    if StopAtAlgoBlock: return
+
+    df_BX_CNT.to_csv(f'{outputDir}/BX_CNT.csv',index=True)
+    df_ePortRxDataGroup.to_csv(f'{outputDir}/ePortRxDataGroup.csv',index=True)
     df_Mux_in.to_csv(f'{outputDir}/Mux_in.csv',index=True)
     df_Mux_out.to_csv(f'{outputDir}/Mux_out.csv',index=True)
     df_F2F.to_csv(f'{outputDir}/F2F.csv',index=True)
-    df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=True)
+    del df_ePortRxDataGroup
     del df_Mux_in
     del df_Mux_out
     del df_F2F
+
 
     if nDropBits==-1:
         DropLSB=3 if isHDM else 1
@@ -126,7 +133,8 @@ if __name__=='__main__':
     parser.add_argument('--STC', '--STC_Type', dest="STC_Type", default=-1, type=int, help='STC Type to use, if -1, STC_4_9 for HDM, STC_16_9 for LDM')
     parser.add_argument('--TxSyncWord', dest="Tx_Sync_Word", default='01100110011', help='11-bit Sync word to use for empty words')
     parser.add_argument('--DropLSB', dest="nDropBits", default=-1, type=int, help='Number of LSB to drop when encoding, if -1 HDM will use 3, LDM will use 1')
-    parser.add_argument('--UseSum', dest="Use_Sum", default=False, type=bool, action="store_true", help='Send only sum of all TC in module sum for TS and BC algorithms instead of sum of only TC not transmitted')
+    parser.add_argument('--UseSum', dest="Use_Sum", default=False, action="store_true", help='Send only sum of all TC in module sum for TS and BC algorithms instead of sum of only TC not transmitted')
+    parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
 
     args = parser.parse_args()
     

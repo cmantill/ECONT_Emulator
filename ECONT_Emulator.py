@@ -20,7 +20,7 @@ from ASICBlocks.Formatter import Format_Threshold_Sum, Format_BestChoice, Format
 from ASICBlocks.BufferBlock import Buffer
 
 
-def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Sum, StopAtAlgoBlock):
+def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Sum, StopAtAlgoBlock, AEMuxOrdering):
     if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
     df_ePortRxDataGroup, df_BX_CNT = loadEportRXData(inputDir)
@@ -33,10 +33,10 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
 
     columns = [f'ePortRxDataGroup_{i}' for i in range(12)]
     df_Mux_in = splitEportRXData(df_ePortRxDataGroup[columns])
-    Mux_Select = getMuxRegisters()
+    Mux_Select = getMuxRegisters(AEMuxOrdering)
     df_Mux_out = Mux(df_Mux_in, Mux_Select)
     df_F2F = FloatToFix(df_Mux_out, isHDM)
-    CALVALUE_Registers, THRESHV_Registers = getCalibrationRegisters_Thresholds(2,33,901,'v10')
+    CALVALUE_Registers, THRESHV_Registers = getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion)
     df_CALQ = Calibrate(df_F2F, CALVALUE_Registers)
 
     df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=True)
@@ -61,6 +61,18 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
 
     TxSyncWord=int(Tx_Sync_Word,2)
     EPORTTX_NUMEN=ePortTx
+    if EPORTTX_NUMEN==-1:
+        if geomVersion in ['v11','v10']:
+            u = int(round(wafer/100.))
+            v = wafer-u*100
+            linkCounts = pd.read_csv('Utils/ModuleLinkSummary.csv',index_col=['Layer','ModU','ModV'])
+            EPORTTX_NUMEN = linkCounts.loc[layer,u,v].ECONT_eTX
+            print(f'Using EPORTTX_NUMEN={EPORTTX_NUMEN}')
+        else:
+            print('EPORTTX_NUMEN must be specified for v9 geometry, cannot look up')
+            print('Using EPORTTX_NUMEN=4')
+            EPORTTX_NUMEN=4
+
     if STC_Type==-1:
         STC_TYPE=0 if isHDM else 1
     else:
@@ -135,6 +147,7 @@ if __name__=='__main__':
     parser.add_argument('--DropLSB', dest="nDropBits", default=-1, type=int, help='Number of LSB to drop when encoding, if -1 HDM will use 3, LDM will use 1')
     parser.add_argument('--UseSum', dest="Use_Sum", default=False, action="store_true", help='Send only sum of all TC in module sum for TS and BC algorithms instead of sum of only TC not transmitted')
     parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
+    parser.add_argument('--AEMuxOrdering', dest="AEMuxOrdering", default=False, action="store_true", help='Use MUX settings to use ordering from autoencoder')
 
     args = parser.parse_args()
     

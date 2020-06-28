@@ -13,9 +13,15 @@ def loadMetaData(_inputDir):
 
 
 def loadEportRXData(_inputDir, headers = None):
-    df = pd.read_csv(f"{_inputDir}/EPORTRX_output.csv",index_col="entry")
-
-    df = pd.read_csv(f"{_inputDir}/EPORTRX_output.csv")
+    df = None
+    for fileName in ['EPORTRX_data','EPORTRX_output']:
+        try:
+            df = pd.read_csv(f"{_inputDir}/{fileName}.csv")
+            break
+        except:
+            continue
+    if df is None:
+        raise AttributeError("Input data not found")
     df['Orbit'] = (np.arange(len(df))/3564).astype(int)
     df['BX'] = np.arange(len(df),dtype=int)%3564
     df.set_index(['Orbit','BX'], inplace=True)

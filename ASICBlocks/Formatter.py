@@ -15,7 +15,7 @@ def splitToWords(row, N=16,totalWords=28):
 def formatThresholdOutput(row,TxSynchWord=0, Use_Sum=False, debug=False):
 
     SUM_FULL =row['SUM']
-    SUM_NOT_TRANSMITTED =row['SUMNOTTRANSMITTED']
+    SUM_NOT_TRANSMITTED =row['SUM_NOT_TRANSMITTED']
     CHARGEQ = row[[f'CHARGEQ_{i}' for i in range(48)]].values
     CHARGEQ=CHARGEQ[CHARGEQ>0]      ## remove zeros
 
@@ -116,7 +116,7 @@ def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
     roundBits = False
     nDropBit = 0 
 
-    ADD_MAP = list(row[[f'BC_TC_Addr_{i}' for i in range(48)]])
+    ADD_MAP = list(row[[f'BC_TC_MAP_{i}' for i in range(48)]])
     CHARGEQ = list(row[[f'BC_CHARGE_{i}' for i in range(48)]])
 
     SUM = encode(sum(CHARGEQ[:]),0,5,3,asInt=True)
@@ -200,8 +200,8 @@ def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_S
 
 
 def formatSTC_4_9(row, nSTC, debug=False):
-    colsSUM=[f'XTC4_9_Sum_{i}' for i in range(12)]
-    colsIDX=[f'MAX4_Addr_{i}' for i in range(12)]
+    colsSUM=[f'XTC4_9_SUM_{i}' for i in range(12)]
+    colsIDX=[f'MAX4_ADDR_{i}' for i in range(12)]
 
     SumData = row[colsSUM].values
     IdxData = row[colsIDX].values
@@ -235,8 +235,8 @@ def formatSTC_4_9(row, nSTC, debug=False):
 
 def formatSTC_16_9(row, nSTC, debug=False):
     
-    colsSUM=[f'XTC16_9_Sum_{i}' for i in range(12)]
-    colsIDX=[f'MAX16_Addr_{i}' for i in range(12)]
+    colsSUM=[f'XTC16_9_SUM_{i}' for i in range(12)]
+    colsIDX=[f'MAX16_ADDR_{i}' for i in range(12)]
 
     SumData = row[colsSUM].values
     IdxData = row[colsIDX].values
@@ -269,8 +269,8 @@ def formatSTC_16_9(row, nSTC, debug=False):
 
 def formatSTC_4_7(row, nSTC, debug=False):
     
-    colsSUM=[f'XTC4_7_Sum_{i}' for i in range(12)]
-    colsIDX=[f'MAX4_Addr_{i}' for i in range(12)]
+    colsSUM=[f'XTC4_7_SUM_{i}' for i in range(12)]
+    colsIDX=[f'MAX4_ADDR_{i}' for i in range(12)]
 
     SumData = row[colsSUM].values
     IdxData = row[colsIDX].values
@@ -304,7 +304,7 @@ def formatSTC_4_7(row, nSTC, debug=False):
 
 def formatCTC_4_7(row, nSTC, debug=False):
     
-    colsSUM=[f'XTC4_7_Sum_{i}' for i in range(12)]
+    colsSUM=[f'XTC4_7_SUM_{i}' for i in range(12)]
 
     SumData = row[colsSUM].values
 
@@ -362,7 +362,7 @@ def Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_
 
 
 def formatRepeaterOutput(row,debug=False):
-    cols = [f'REPEATERQ_{i}' for i in range(48)]
+    cols = [f'RPT_{i}' for i in range(48)]
     CHARGEQ = row[cols].values
     ChargeData = ''
     for x in CHARGEQ:

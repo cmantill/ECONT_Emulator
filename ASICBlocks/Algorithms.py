@@ -31,7 +31,7 @@ def ThresholdSum(df_CALQ, THRESHV_Registers, DropLSB):
     qlist = ((df_CALQ>=THRESHV_Registers).astype(int)*df_CALQ).apply(makeCHARGEQ, nDropBit=DropLSB,axis=1)
     df_Threshold_Sum[CHARGEQ_Headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_Headers)
     df_Threshold_Sum['SUM'] = encodeV((df_CALQ).sum(axis=1),0,5,3,False,True)
-    df_Threshold_Sum['SUMNOTTRANSMITTED'] = encodeV((df_CALQ<THRESHV_Registers).sum(axis=1),0,5,3,False,True)
+    df_Threshold_Sum['SUM_NOT_TRANSMITTED'] = encodeV((df_CALQ<THRESHV_Registers).sum(axis=1),0,5,3,False,True)
 
     return df_Threshold_Sum
 
@@ -46,7 +46,7 @@ def BestChoice(df_CALQ, DropLSB):
     df_sorted_index = pd.DataFrame(df_in.apply(batcher_sort, axis=1))
 
     df_sorted.columns = ['BC_CHARGE_{}'.format(i) for i in range(0, df_sorted.shape[1])]
-    df_sorted_index.columns = ['BC_TC_Addr_{}'.format(i) for i in range(0, df_sorted_index.shape[1])]
+    df_sorted_index.columns = ['BC_TC_MAP_{}'.format(i) for i in range(0, df_sorted_index.shape[1])]
 
     df_sorted[df_sorted_index.columns] = df_sorted_index
     return df_sorted
@@ -61,12 +61,12 @@ def SuperTriggerCell(df_CALQ):
     stcData_2x2 = df_CALQ.apply(supertriggercell_2x2,axis=1)
     stcData_4x4 = df_CALQ.apply(supertriggercell_4x4,axis=1)
 
-    cols_XTC4_9 = [f'XTC4_9_Sum_{i}' for i in range(12)]
-    cols_XTC4_7 = [f'XTC4_7_Sum_{i}' for i in range(12)]
-    cols_MAX4_ADDR = [f'MAX4_Addr_{i}' for i in range(12)]
+    cols_XTC4_9 = [f'XTC4_9_SUM_{i}' for i in range(12)]
+    cols_XTC4_7 = [f'XTC4_7_SUM_{i}' for i in range(12)]
+    cols_MAX4_ADDR = [f'MAX4_ADDR_{i}' for i in range(12)]
     
-    cols_XTC16_9 = [f'XTC16_9_Sum_{i}' for i in range(3)]
-    cols_MAX16_ADDR = [f'MAX16_Addr_{i}' for i in range(3)]
+    cols_XTC16_9 = [f'XTC16_9_SUM_{i}' for i in range(3)]
+    cols_MAX16_ADDR = [f'MAX16_ADDR_{i}' for i in range(3)]
 
     df_SuperTriggerCell = pd.DataFrame(stcData_2x2.tolist(),columns = cols_XTC4_9+cols_MAX4_ADDR, index = df_CALQ.index)
 
@@ -89,7 +89,7 @@ def Repeater(df_CALQ, DropLSB):
 
     df_Repeater = df_CALQ.apply(encodeV,args=(DropLSB,4,3,False,True))
     
-    df_Repeater.columns = [f'REPEATERQ_{i}' for i in range(48)]
+    df_Repeater.columns = [f'RPT_{i}' for i in range(48)]
     
     return df_Repeater
     

@@ -79,16 +79,23 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
         STC_TYPE = STC_Type
 
 
-    pd.DataFrame([Mux_Select], columns=[f'Mux_Select_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/Mux_Select.csv', index=True)
+    pd.DataFrame([Mux_Select], columns=[f'MUX_SELECT_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/Mux_Select.csv', index=True)
     pd.DataFrame([CALVALUE_Registers], columns=[f'CALVALUE_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/CALVALUE.csv', index=True)
     pd.DataFrame([THRESHV_Registers], columns=[f'THRESHV_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/THRESHV.csv', index=True)
-    pd.DataFrame([[DropLSB]], columns=['DropLSB'],index=df_CALQ.index).to_csv(f'{outputDir}/DropLSB.csv', index=True)
-    pd.DataFrame([[int(isHDM)]], columns=['HighDensity'],index=df_CALQ.index).to_csv(f'{outputDir}/HighDensity.csv', index=True)
-    pd.DataFrame([[TxSyncWord]], columns=['TxSyncWord'],index=df_CALQ.index).to_csv(f'{outputDir}/TxSyncWord.csv', index=True)
-    pd.DataFrame([[EPORTTX_NUMEN]], columns=['EPORTTX_NUMEN'],index=df_CALQ.index).to_csv(f'{outputDir}/EPORTTX_NUMEN.csv', index=True)
+    pd.DataFrame([[DropLSB]], columns=['DROP_LSB'],index=df_CALQ.index).to_csv(f'{outputDir}/DropLSB.csv', index=True)
+    pd.DataFrame([[int(isHDM)]], columns=['HIGH_DENSITY'],index=df_CALQ.index).to_csv(f'{outputDir}/HighDensity.csv', index=True)
+    pd.DataFrame([[TxSyncWord]], columns=['TX_SYNC_WORD'],index=df_CALQ.index).to_csv(f'{outputDir}/TxSyncWord.csv', index=True)
+    pd.DataFrame([[EPORTTX_NUMEN]], columns=['EPORT_TX_NUMEN'],index=df_CALQ.index).to_csv(f'{outputDir}/EPORTTX_NUMEN.csv', index=True)
     pd.DataFrame([[STC_TYPE]], columns=['STC_TYPE'],index=df_CALQ.index).to_csv(f'{outputDir}/STC_TYPE.csv', index=True)
-    pd.DataFrame([[Use_Sum]], columns=['Use_Sum'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=True)
+    pd.DataFrame([[Use_Sum]], columns=['USE_SUM'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=True)
 
+    BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*12*2
+    BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*12*2-25
+    BUFFER_THRESHOLD_T3 = 25
+
+    pd.DataFrame([[int(BUFFER_THRESHOLD_T1)]], columns=['BUFFER_THRESHOLD_T1'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T1.csv', index=True)
+    pd.DataFrame([[int(BUFFER_THRESHOLD_T2)]], columns=['BUFFER_THRESHOLD_T2'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T2.csv', index=True)
+    pd.DataFrame([[int(BUFFER_THRESHOLD_T3)]], columns=['BUFFER_THRESHOLD_T3'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T3.csv', index=True)
 
 
     df_Threshold_Sum, df_BestChoice, df_SuperTriggerCell, df_Repeater = Algorithms(df_CALQ, THRESHV_Registers, DropLSB)
@@ -101,9 +108,8 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
     df_Repeater.to_csv(f'{outputDir}/Repeater.csv',index=True)
 
 
-
     df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum)
-    df_BufferOutput_TS  = Buffer(df_Format_TS,  EPORTTX_NUMEN, EPORTTX_NUMEN*12*2, EPORTTX_NUMEN*12*2-25, 25)
+    df_BufferOutput_TS  = Buffer(df_Format_TS,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Threshold_Sum
     df_Format_TS.to_csv(f'{outputDir}/Format_TS.csv',index=True)
     df_BufferOutput_TS.to_csv(f'{outputDir}/Buffer_TS.csv',index=True)
@@ -111,7 +117,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
     del df_BufferOutput_TS
 
     df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum)
-    df_BufferOutput_BC  = Buffer(df_Format_BC,  EPORTTX_NUMEN, EPORTTX_NUMEN*12*2, EPORTTX_NUMEN*12*2-25, 25)
+    df_BufferOutput_BC  = Buffer(df_Format_BC,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_BestChoice
     df_Format_BC.to_csv(f'{outputDir}/Format_BC.csv',index=True)
     df_BufferOutput_BC.to_csv(f'{outputDir}/Buffer_BC.csv',index=True)
@@ -119,7 +125,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
     del df_BufferOutput_BC
 
     df_Format_STC = Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord)
-    df_BufferOutput_STC = Buffer(df_Format_STC, EPORTTX_NUMEN, EPORTTX_NUMEN*12*2, EPORTTX_NUMEN*12*2-25, 25)
+    df_BufferOutput_STC = Buffer(df_Format_STC, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_SuperTriggerCell
     df_Format_STC.to_csv(f'{outputDir}/Format_STC.csv',index=True)
     df_BufferOutput_STC.to_csv(f'{outputDir}/Buffer_STC.csv',index=True)
@@ -127,7 +133,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
     del df_BufferOutput_STC
 
     df_Format_RPT = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord)    
-    df_BufferOutput_RPT = Buffer(df_Format_RPT, EPORTTX_NUMEN, EPORTTX_NUMEN*12*2, EPORTTX_NUMEN*12*2-25, 25)
+    df_BufferOutput_RPT = Buffer(df_Format_RPT, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Repeater
     df_Format_RPT.to_csv(f'{outputDir}/Format_RPT.csv',index=True)
     df_BufferOutput_RPT.to_csv(f'{outputDir}/Buffer_RPT.csv',index=True)

@@ -196,7 +196,7 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
         # waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna("0000000000000000000000000000")
         waferInput.fillna(0,inplace=True)
 
-        waferInput.astype(int).to_csv(f"{waferDir}/EPORTRX_output{jobInfo}.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
+        waferInput.astype(int).to_csv(f"{waferDir}/EPORTRX_data{jobInfo}.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
 
         isHDM = df[df.wafer==_wafer].head().isHDM.any()
 
@@ -364,7 +364,7 @@ if __name__=='__main__':
     parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
     parser.add_option('--Nfiles', type=int, default = 1 ,dest="Nfiles", help="Limit on number of files to read (-1 is all)")
-    parser.add_option('--Nevents', type=int, default = 50 ,dest="Nevents", help="Limit on number of events to read per file (-1 is all)")
+    parser.add_option('--Nevents', type=int, default = -1 ,dest="Nevents", help="Limit on number of events to read per file (-1 is all)")
     parser.add_option('--chunkSize', type=int, default = 100000 ,dest="chunkSize", help="Number of events to load from root file in a single chunk")
     parser.add_option('--jobSplit', type="string", default = "1/1" ,dest="jobSplit", help="Split of the input root files")
     parser.add_option("--v10", default = False, action='store_true',dest="useV10", help="use v10 geometry")

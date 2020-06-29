@@ -46,11 +46,12 @@ def Buffer(df_formatterOutput, EPORTTX_NUMEN, T1 , T2, T3):
         BufferContents[0:400-2*EPORTTX_NUMEN] = BufferContents[2*EPORTTX_NUMEN:400]
         writePointer = max(writePointer-2*EPORTTX_NUMEN, 0)
 
+        outputData += [None]*(14-EPORTTX_NUMEN)
         outputData += [truncated, Nbuf, NBXc, cond1, cond2, cond3, cond4]
         
         totalData.append(outputData)
 
-    txDataColumns = [f'TX_DATA_{i}' for i in range(EPORTTX_NUMEN)]
+    txDataColumns = [f'TX_DATA_{i}' for i in range(14)]
     statusColumns = ['Truncated', 'Nbuf', 'NBXc', 'Cond1', 'Cond2','Cond3','Cond4']
     df_BufferOutput = pd.DataFrame(data = np.array(totalData), columns=txDataColumns + statusColumns, index=df_formatterOutput.index)
 

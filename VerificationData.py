@@ -143,7 +143,12 @@ def FormatBuffer(inputDir, outputDir):
                  ['Algorithm_Output_BC_Charge.csv', 'Formatter_Buffer_Input_BC_Charge.csv'],
                  ['Algorithm_Output_BC_TC_map.csv', 'Formatter_Buffer_Input_BC_TC_map.csv'],
                  ['Algorithm_Output_RepeaterQ.csv', 'Formatter_Buffer_Input_RepeaterQ.csv'],
-                 ['Algorithm_Output_Header.csv', 'Formatter_Buffer_Input_Header.csv']]
+                 ['Algorithm_Output_Header.csv', 'Formatter_Buffer_Input_Header.csv'],
+                 ['Algorithm_Input_Type_TS.csv', 'Formatter_Buffer_Input_Type_TS.csv'],
+                 ['Algorithm_Input_Type_STC.csv', 'Formatter_Buffer_Input_Type_STC.csv'],
+                 ['Algorithm_Input_Type_BC.csv', 'Formatter_Buffer_Input_Type_BC.csv'],
+                 ['Algorithm_Input_Type_RPT.csv', 'Formatter_Buffer_Input_Type_RPT.csv'],
+             ]
 
     for fSrc, fDest in linkFiles:
         if not os.path.exists(f'{outputDir}/{fDest}'):

@@ -31,7 +31,7 @@ def ThresholdSum(df_CALQ, THRESHV_Registers, DropLSB):
     qlist = ((df_CALQ>=THRESHV_Registers).astype(int)*df_CALQ).apply(makeCHARGEQ, nDropBit=DropLSB,axis=1)
     df_Threshold_Sum[CHARGEQ_Headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_Headers)
     df_Threshold_Sum['SUM'] = encodeV((df_CALQ).sum(axis=1),0,5,3,False,True)
-    df_Threshold_Sum['SUM_NOT_TRANSMITTED'] = encodeV((df_CALQ<THRESHV_Registers).sum(axis=1),0,5,3,False,True)
+    df_Threshold_Sum['SUM_NOT_TRANSMITTED'] = encodeV(((df_CALQ<THRESHV_Registers)*df_CALQ).sum(axis=1),0,5,3,False,True)
 
     return df_Threshold_Sum
 

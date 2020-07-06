@@ -135,6 +135,7 @@ def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
 
     bx_cnt = row['BX_CNT']
     header =  format(bx_cnt, '#0%ib'%(7))[2:]
+    header = header[0] + header[2:]
 
     if Use_Sum:
         modSumData = format(SUM, '#010b')[2:]
@@ -209,8 +210,9 @@ def formatSTC_4_9(row, nSTC, debug=False):
     nBitsAddr = 2 
 
     #only a 4 bit header for STC
-    bx_cnt = row['BX_CNT']%16
-    header =  format(bx_cnt, '#0%ib'%(6))[2:]
+    bx_cnt = row['BX_CNT']
+    header =  format(bx_cnt, '#0%ib'%(7))[2:]
+    header = header[0] + header[2:]
     
     STC_Data = ""
     for i in range(nSTC):
@@ -244,8 +246,9 @@ def formatSTC_16_9(row, nSTC, debug=False):
     nBitsAddr = 4 
 
     #only a 4 bit header for STC
-    bx_cnt = row['BX_CNT']%16
-    header =  format(bx_cnt, '#0%ib'%(6))[2:]
+    bx_cnt = row['BX_CNT']
+    header =  format(bx_cnt, '#0%ib'%(7))[2:]
+    header = header[0] + header[2:]
     
     STC_Data = ""
     for i in range(nSTC):
@@ -278,8 +281,9 @@ def formatSTC_4_7(row, nSTC, debug=False):
     nBitsAddr = 4 
 
     #only a 4 bit header for STC
-    bx_cnt = row['BX_CNT']%16
-    header =  format(bx_cnt, '#0%ib'%(6))[2:]
+    bx_cnt = row['BX_CNT']
+    header =  format(bx_cnt, '#0%ib'%(7))[2:]
+    header = header[0] + header[2:]
     
     STC_Data = ""
     for i in range(nSTC):
@@ -311,8 +315,9 @@ def formatCTC_4_7(row, nSTC, debug=False):
     nBitsAddr = 4 
 
     #only a 4 bit header for STC
-    bx_cnt = row['BX_CNT']%16
-    header =  format(bx_cnt, '#0%ib'%(6))[2:]
+    bx_cnt = row['BX_CNT']
+    header =  format(bx_cnt, '#0%ib'%(7))[2:]
+    header = header[0] + header[2:]
     
     STC_Data = ""
     for i in range(nSTC):

@@ -24,12 +24,17 @@ def loadEportRXData(_inputDir, headers = None):
         raise AttributeError("Input data not found")
     df['Orbit'] = (np.arange(len(df))/3564).astype(int)
     df['BX'] = np.arange(len(df),dtype=int)%3564
-    df.set_index(['Orbit','BX'], inplace=True)
 
     if headers is None:
-        df_BX_CNT = pd.DataFrame(np.arange(len(df))%32, columns=['BX_CNT'], index=df.index)
+        headers = df['BX'].values%16
+        headers[df['BX'].values==0] = 31
 
     columns = [f'ePortRxDataGroup_{i}' for i in range(12)] + ['entry']
+    
+    df.set_index(['Orbit','BX'], inplace=True)
+
+    df_BX_CNT = pd.DataFrame(headers, columns=['BX_CNT'], index=df.index)
+
     return df[columns], df_BX_CNT
 
 def splitEportRXData(df_ePortRxDataGroup):

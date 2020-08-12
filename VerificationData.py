@@ -13,6 +13,58 @@ def addSpaceToCSV(outputDir, fileList):
                 outputFile.write(line.replace(',',', '))
 
 
+def EPortRXTestBench(inputDir, outputDir):
+    NewFiles = []
+
+    #link algorithm outputs to formatter inputs
+    linkFiles = [['MuxFixCalib_Input_ePortRxDataGroup.csv', 'EPortRX_Output_ePortRxDataGroup.csv'],
+    ]
+
+    for fSrc, fDest in linkFiles:
+        if not os.path.exists(f'{outputDir}/{fDest}'):
+            os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
+    
+    shutil.copy(f'{inputDir}/ORBSYN_CNT_LOAD_VAL.csv',f'{outputDir}/EPortRX_Input_ORBSYN_CNT_LOAD_VAL.csv')
+    NewFiles.append('EPortRX_Input_ORBSYN_CNT_LOAD_VAL.csv')
+    shutil.copy(f'{inputDir}/EPORTRX_data.csv',f'{outputDir}/EPortRX_Input_EPORTRX_data.csv')
+    NewFiles.append('EPortRX_Input_EPORTRX_data.csv')
+    
+    #update file contents to leave space after comma in csv
+    addSpaceToCSV(outputDir, NewFiles)
+
+def MuxFixCalibTestBench(inputDir, outputDir):
+    NewFiles = []
+
+    #link algorithm outputs to formatter inputs
+    linkFiles = [['Algorithm_Input_CalQ.csv', 'MuxFixCalib_Output_CALQ.csv'],    
+    ]
+
+    for fSrc, fDest in linkFiles:
+        if not os.path.exists(f'{outputDir}/{fDest}'):
+            os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
+    
+    #copy registers 
+    shutil.copy(f'{inputDir}/HighDensity.csv', f'{outputDir}/MuxFixCalib_Input_HighDensity.csv')
+    NewFiles.append('MuxFixCalib_Input_HighDensity.csv')
+    shutil.copy(f'{inputDir}/Mux_Select.csv', f'{outputDir}/MuxFixCalib_Input_Mux_Select.csv')
+    NewFiles.append('MuxFixCalib_Input_Mux_Select.csv')
+    shutil.copy(f'{inputDir}/CALVALUE.csv', f'{outputDir}/MuxFixCalib_Input_CALVALUE.csv')
+    NewFiles.append('MuxFixCalib_Input_CALVALUE.csv')
+
+    #inputs and internal values
+    shutil.copy(f'{inputDir}/ePortRxDataGroup.csv', f'{outputDir}/MuxFixCalib_Input_ePortRxDataGroup.csv')
+    NewFiles.append('MuxFixCalib_Input_ePortRxDataGroup.csv')
+    shutil.copy(f'{inputDir}/Mux_in.csv', f'{outputDir}/MuxFixCalib_Input_Mux_in.csv')
+    NewFiles.append('MuxFixCalib_Input_Mux_in.csv')
+    shutil.copy(f'{inputDir}/Mux_out.csv', f'{outputDir}/MuxFixCalib_Internal_Mux_out.csv')
+    NewFiles.append('MuxFixCalib_Internal_Mux_out.csv')
+    shutil.copy(f'{inputDir}/F2F.csv', f'{outputDir}/MuxFixCalib_Internal_F2F.csv')
+    NewFiles.append('MuxFixCalib_Internal_F2F.csv')
+
+    #update file contents to leave space after comma in csv
+    addSpaceToCSV(outputDir, NewFiles)
+
+
 def AlgoTestBench(inputDir, outputDir):
     NewFiles = []
 
@@ -154,15 +206,17 @@ def FormatBuffer(inputDir, outputDir):
         if not os.path.exists(f'{outputDir}/{fDest}'):
             os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
 
-def main(inputDir, outputDir):
-    TestBenchList = []
+def makeVerificationData(inputDir, outputDir):
 
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
 
     shutil.copy(f'{inputDir}/metaData.py',f'{outputDir}/metaData.py')
+
     AlgoTestBench(inputDir, outputDir)
     FormatBuffer(inputDir, outputDir)
+    MuxFixCalibTestBench(inputDir, outputDir)
+    EPortRXTestBench(inputDir, outputDir)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
@@ -171,4 +225,4 @@ if __name__=='__main__':
 
     args = parser.parse_args()
     
-    main(**vars(args))
+    makeVerificationData(**vars(args))

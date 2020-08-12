@@ -20,7 +20,7 @@ from ASICBlocks.Formatter import Format_Threshold_Sum, Format_BestChoice, Format
 from ASICBlocks.BufferBlock import Buffer
 
 
-def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Sum, StopAtAlgoBlock, AEMuxOrdering):
+def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False):
     if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
     df_ePortRxDataGroup, df_BX_CNT = loadEportRXData(inputDir)
@@ -30,11 +30,12 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
 
     if not os.path.exists(outputDir):
         os.mkdir(outputDir)
-
+    print('MuxFixCalib')
     columns = [f'ePortRxDataGroup_{i}' for i in range(12)]
     df_Mux_in = splitEportRXData(df_ePortRxDataGroup[columns])
     Mux_Select = getMuxRegisters(AEMuxOrdering)
     df_Mux_out = Mux(df_Mux_in, Mux_Select)
+
     df_F2F = FloatToFix(df_Mux_out, isHDM)
     CALVALUE_Registers, THRESHV_Registers = getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion)
     df_CALQ = Calibrate(df_F2F, CALVALUE_Registers)
@@ -43,6 +44,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
 
     if StopAtAlgoBlock: return
 
+    print('Algorithm')
     df_BX_CNT.to_csv(f'{outputDir}/BX_CNT.csv',index=True)
     df_ePortRxDataGroup.to_csv(f'{outputDir}/ePortRxDataGroup.csv',index=True)
     df_Mux_in.to_csv(f'{outputDir}/Mux_in.csv',index=True)
@@ -107,7 +109,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
     df_SuperTriggerCell.to_csv(f'{outputDir}/SuperTriggerCell.csv',index=True)
     df_Repeater.to_csv(f'{outputDir}/Repeater.csv',index=True)
 
-
+    print('Formatter/Buffer Threshold-Sum')
     df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum)
     df_BufferOutput_TS  = Buffer(df_Format_TS,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Threshold_Sum
@@ -116,6 +118,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
     del df_Format_TS
     del df_BufferOutput_TS
 
+    print('Formatter/Buffer Best Choice')
     df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum)
     df_BufferOutput_BC  = Buffer(df_Format_BC,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_BestChoice
@@ -124,6 +127,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
     del df_Format_BC
     del df_BufferOutput_BC
 
+    print('Formatter/Buffer STC')
     df_Format_STC = Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord)
     df_BufferOutput_STC = Buffer(df_Format_STC, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_SuperTriggerCell
@@ -132,6 +136,7 @@ def main(inputDir, outputDir, ePortTx, STC_Type, Tx_Sync_Word, nDropBits, Use_Su
     del df_Format_STC
     del df_BufferOutput_STC
 
+    print('Formatter/Buffer Repeater')
     df_Format_RPT = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord)    
     df_BufferOutput_RPT = Buffer(df_Format_RPT, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Repeater
@@ -157,4 +162,4 @@ if __name__=='__main__':
 
     args = parser.parse_args()
     
-    main(**vars(args))
+    runEmulator(**vars(args))

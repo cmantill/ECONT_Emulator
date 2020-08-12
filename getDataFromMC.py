@@ -286,33 +286,38 @@ def main(opt,args):
     print('loading')
 
 
-    fileNameContent = opt.inputFile
+    fileName = opt.inputFile
+    fileNameContent = opt.inputFileFormat
     eosDir = opt.eosDir
 
-    if fileNameContent is None:
-        if opt.useV10:
-            fileNameContent='ntuple_ttbar200PU_RelVal_job'
-        elif opt.useV11:
-            fileNameContent='ntuple_ttbar_ttbar_v11_aged_unbiased_20191101_'
-        else:
-            fileNameContent='ntuple_hgcalNtuples_ttbar_200PU'
-    if eosDir is None:
-        if opt.useV10:
-            eosDir = '/store/user/dnoonan/HGCAL_Concentrator/NewNtuples/v10_Geom'
-        elif opt.useV11:
-            eosDir = '/store/user/lpchgcal/ConcentratorNtuples/L1THGCal_Ntuples/TTbar_v11'
-        else:
-            eosDir = '/store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar'
-
-    fileList = []
-    # get list of files
-    cmd = "xrdfs root://cmseos.fnal.gov ls %s"%eosDir
-
-    dirContents,stderr = Popen(cmd,shell=True,stdout=PIPE,stderr=PIPE).communicate()
-    dirContentsList = dirContents.decode('ascii').split("\n")
-    for fName in dirContentsList:
-        if fileNameContent in fName:
-            fileList.append("root://cmseos.fnal.gov/%s"%(fName))
+    if fileName is None:
+        if fileNameContent is None:
+            if opt.useV10:
+                fileNameContent='ntuple_ttbar200PU_RelVal_job'
+            elif opt.useV11:
+                fileNameContent='ntuple_ttbar_ttbar_v11_aged_unbiased_20191101_'
+            else:
+                fileNameContent='ntuple_hgcalNtuples_ttbar_200PU'
+    
+        if eosDir is None:
+            if opt.useV10:
+                eosDir = '/store/user/dnoonan/HGCAL_Concentrator/NewNtuples/v10_Geom'
+            elif opt.useV11:
+                eosDir = '/store/user/lpchgcal/ConcentratorNtuples/L1THGCal_Ntuples/TTbar_v11'
+            else:
+                eosDir = '/store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar'
+    
+        fileList = []
+        # get list of files
+        cmd = "xrdfs root://cmseos.fnal.gov ls %s"%eosDir
+    
+        dirContents,stderr = Popen(cmd,shell=True,stdout=PIPE,stderr=PIPE).communicate()
+        dirContentsList = dirContents.decode('ascii').split("\n")
+        for fName in dirContentsList:
+            if fileNameContent in fName:
+                fileList.append("root://cmseos.fnal.gov/%s"%(fName))
+    else:
+        fileList = [fileName]
 
     startFileNum = 0
     stopFileNum = -1
@@ -352,7 +357,8 @@ def main(opt,args):
 
 if __name__=='__main__':
     parser = optparse.OptionParser()
-    parser.add_option('-i',"--inputFile", type="string", default = None,dest="inputFile", help="input TPG ntuple name format")
+    parser.add_option('-i',"--inputFile", type="string", default = None,dest="inputFile", help="input file name (single file to run on)")
+    parser.add_option("--inputFileFormat", type="string", default = None,dest="inputFileFormat", help="input TPG ntuple name format")
     parser.add_option("--eosDir", type="string", default = None,dest="eosDir", help="direcot")
     # parser.add_option('-i',"--inputFile", type="string", default = 'ntuple_hgcalNtuples_ttbar_200PU',dest="inputFile", help="input TPG ntuple name format")
     # parser.add_option("--eosDir", type="string", default = '/store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar',dest="eosDir", help="direcot")

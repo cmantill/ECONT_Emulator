@@ -20,7 +20,7 @@ from ASICBlocks.Formatter import Format_Threshold_Sum, Format_BestChoice, Format
 from ASICBlocks.BufferBlock import Buffer
 
 
-def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False):
+def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False):
     if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
     df_ePortRxDataGroup, df_BX_CNT = loadEportRXData(inputDir)
@@ -40,7 +40,15 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     CALVALUE_Registers, THRESHV_Registers = getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion)
     df_CALQ = Calibrate(df_F2F, CALVALUE_Registers)
 
-    df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=True)
+    if SimEnergyFlag:
+        df_SimEnergyStatus = pd.read_csv(f'{inputDir}/SimEnergyStatus.csv')
+        print(df_CALQ)
+        print(df_SimEnergyStatus)
+        df_CALQ['SimEnergyPresent'] = df_SimEnergyStatus[['SimEnergyPresent']].values
+        df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=True)
+        df_CALQ.drop('SimEnergyPresent',axis=1,inplace=True)
+    else:
+        df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=True)
 
     if StopAtAlgoBlock: return
 
@@ -159,6 +167,7 @@ if __name__=='__main__':
     parser.add_argument('--UseSum', dest="Use_Sum", default=False, action="store_true", help='Send only sum of all TC in module sum for TS and BC algorithms instead of sum of only TC not transmitted')
     parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
     parser.add_argument('--AEMuxOrdering', dest="AEMuxOrdering", default=False, action="store_true", help='Use MUX settings to use ordering from autoencoder')
+    parser.add_argument('--SimEnergyFlag', dest="SimEnergyFlag", default=False, action="store_true", help='Add flag of whether sim energy is present to the CALQ dataframe')
 
     args = parser.parse_args()
     

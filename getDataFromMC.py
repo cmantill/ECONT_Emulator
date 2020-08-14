@@ -68,12 +68,12 @@ def processTree(_tree, geomDF, subdet, layer, geomVersion="v9", jobNumber=0, nEv
         else:
             nStop = nEvents + nStart
     if geomVersion in ['v10','v11']:
-        df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_waferu','tc_waferv','tc_cellu','tc_cellv','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystart=nStart,entrystop=nStop)
-        df.columns = ['subdet','zside','layer','waferu','waferv','triggercellu','triggercellv','uncompressedCharge','compressedCharge','data','mipPt']
+        df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_waferu','tc_waferv','tc_cellu','tc_cellv','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt','tc_simenergy'],entrystart=nStart,entrystop=nStop)
+        df.columns = ['subdet','zside','layer','waferu','waferv','triggercellu','triggercellv','uncompressedCharge','compressedCharge','data','mipPt','simenergy']
 
     else:
-        df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt'],entrystart=nStart,entrystop=nStop)
-        df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt']
+        df = _tree.pandas.df( ['tc_subdet','tc_zside','tc_layer','tc_wafer','tc_cell','tc_uncompressedCharge','tc_compressedCharge','tc_data','tc_mipPt','tc_simenergy'],entrystart=nStart,entrystop=nStop)
+        df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt','simenergy']
     df.reset_index('subentry',drop=True,inplace=True)
 
     #remove unwanted layers
@@ -138,7 +138,6 @@ def processTree(_tree, geomDF, subdet, layer, geomVersion="v9", jobNumber=0, nEv
                                    df.uncompressedCharge.apply(encode,args=(nDropLDM,nExp,nMant,roundBits,True)))
 
 
-
     return df.reset_index()
 
 
@@ -157,6 +156,9 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
 #    gb = df.groupby(['subdet','layer','wafer','entry'],group_keys=False)
 
     encodedlist   = gb[['ECON_TC_Number_PreMux','encodedCharge']].apply(makeTCindexCols,'encodedCharge',-1,'ECON_TC_Number_PreMux')
+
+    simEnergy =gb[['simenergy']].sum()>0
+    simEnergy.columns=['SimEnergyPresent']
 
     df_out     = pd.DataFrame(index=encodedlist.index)
     df_out[ENCODED_headers]= pd.DataFrame((encodedlist).values.tolist(),index=encodedlist.index)
@@ -197,6 +199,9 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
         waferInput.fillna(0,inplace=True)
 
         waferInput.astype(int).to_csv(f"{waferDir}/EPORTRX_data{jobInfo}.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
+
+        simEnergy.loc[_wafer].astype(int).to_csv(f"{waferDir}/SimEnergyStatus{jobInfo}.csv",columns=["SimEnergyPresent"],index='entry', mode=writeMode, header=header)
+
 
         isHDM = df[df.wafer==_wafer].head().isHDM.any()
 

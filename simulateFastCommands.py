@@ -143,13 +143,15 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1, ORBSYN_CNT_
     #do link resets
     idle_packet = 2899102924 #0xaccccccc
 
+    econtLinkReset=pd.DataFrame({'LINKRESETECONT':[0]*N},index=eportRXData.index)
+
     for f in fastCommands:
         _command = f[0]
         _orbit = f[1]
         _bucket = f[2]
         _globalBX = _orbit* 3564 + _bucket
 
-        if _command.lower()=='linkreset':
+        if _command.lower()=='linkresetroct':
             eportRXData.loc[_globalBX,'FASTCMD'] = "FASTCMD_"+_command.upper()
 
             _bxSyncEnd = _globalBX + 255
@@ -157,6 +159,15 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1, ORBSYN_CNT_
                 _bxSyncEnd = N-1
 
             eportRXData.loc[_globalBX:_bxSyncEnd,dataCols] = idle_packet
+
+        if _command.lower()=='linkresetecont':
+            eportRXData.loc[_globalBX,'FASTCMD'] = "FASTCMD_"+_command.upper()
+
+            _bxSyncEnd = _globalBX + 255
+            if _bxSyncEnd>=N:
+                _bxSyncEnd = N-1
+
+            econtLinkReset.loc[_globalBX:_bxSyncEnd,'LINK_RESET_ECONT'] = 1
 
     for c in offsetChanges:
         _orbit = c[0]
@@ -200,6 +211,7 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1, ORBSYN_CNT_
             eportRXData.loc[_globalBX:,_column] = newData
 
     eportRXData.to_csv(outputFile,index=False)
+    econtLinkReset.to_csv(f'{outputDir}/LinkResetEconT.csv',index=False)
 
     return offsetChanges, fastCommands, N
 
@@ -233,5 +245,5 @@ if __name__=='__main__':
 
     makeVerificationData(tempOutputDir, args.outputDir)
 
-    shutil.rmtree(tempOutputDir)
+#    shutil.rmtree(tempOutputDir)
     

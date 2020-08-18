@@ -106,7 +106,7 @@ def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum):
 
     df_Format['FRAMEQ_Truncated'] = df_in.apply(formatThresholdTruncatedOutput,axis=1)
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated','IdleWord']]
 
 
 def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
@@ -195,7 +195,7 @@ def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_S
 
     df_Format['FRAMEQ_Truncated'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated','IdleWord']]
 
 
 
@@ -363,7 +363,7 @@ def Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_
 
     df_Format['FRAMEQ_Truncated'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated','IdleWord']]
 
 
 def formatRepeaterOutput(row,debug=False):
@@ -397,4 +397,4 @@ def Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord):
 
     df_Format['FRAMEQ_Truncated'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated','IdleWord']]

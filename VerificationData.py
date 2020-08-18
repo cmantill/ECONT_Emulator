@@ -3,6 +3,13 @@ import shutil
 import argparse
 import os
 
+saveIndex=False
+
+if saveIndex:
+    index_col=['Orbit','BX']
+else:
+    index_col=None
+
 def addSpaceToCSV(outputDir, fileList):
 
     for fName in fileList:
@@ -79,53 +86,53 @@ def AlgoTestBench(inputDir, outputDir):
     NewFiles.append('Algorithm_Input_DropLSB.csv')
 
     #Algorith input and output Header are BX_CNT
-    df = pd.read_csv(f'{inputDir}/BX_CNT.csv',index_col=['Orbit','BX'])
+    df = pd.read_csv(f'{inputDir}/BX_CNT.csv',index_col=index_col)
     df.columns = ['HEADER_IN']
-    df.to_csv(f'{outputDir}/Algorithm_Input_Header.csv')
+    df.to_csv(f'{outputDir}/Algorithm_Input_Header.csv', index=saveIndex)
     NewFiles.append('Algorithm_Input_Header.csv')
     df.columns = ['HEADER_OUT']
-    df.to_csv(f'{outputDir}/Algorithm_Output_Header.csv')
+    df.to_csv(f'{outputDir}/Algorithm_Output_Header.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_Header.csv')
 
     #Make Algo Type csv's
-    pd.DataFrame(0,columns=['TYPE'],index=df.index).to_csv(f'{outputDir}/Algorithm_Input_Type_TS.csv')
+    pd.DataFrame(0,columns=['TYPE'],index=df.index).to_csv(f'{outputDir}/Algorithm_Input_Type_TS.csv', index=saveIndex)
     NewFiles.append('Algorithm_Input_Type_TS.csv')
-    pd.DataFrame(1,columns=['TYPE'],index=df.index).to_csv(f'{outputDir}/Algorithm_Input_Type_STC.csv')
+    pd.DataFrame(1,columns=['TYPE'],index=df.index).to_csv(f'{outputDir}/Algorithm_Input_Type_STC.csv', index=saveIndex)
     NewFiles.append('Algorithm_Input_Type_STC.csv')
-    pd.DataFrame(2,columns=['TYPE'],index=df.index).to_csv(f'{outputDir}/Algorithm_Input_Type_BC.csv')
+    pd.DataFrame(2,columns=['TYPE'],index=df.index).to_csv(f'{outputDir}/Algorithm_Input_Type_BC.csv', index=saveIndex)
     NewFiles.append('Algorithm_Input_Type_BC.csv')
-    pd.DataFrame(3,columns=['TYPE'],index=df.index).to_csv(f'{outputDir}/Algorithm_Input_Type_RPT.csv')
+    pd.DataFrame(3,columns=['TYPE'],index=df.index).to_csv(f'{outputDir}/Algorithm_Input_Type_RPT.csv', index=saveIndex)
     NewFiles.append('Algorithm_Input_Type_RPT.csv')
 
     #load and output threshold sum data
-    df = pd.read_csv(f'{inputDir}/Threshold_Sum.csv',index_col=['Orbit','BX'])
-    df[[f'CHARGEQ_{i}' for i in range(48)]].to_csv(f'{outputDir}/Algorithm_Output_ChargeQ.csv')
+    df = pd.read_csv(f'{inputDir}/Threshold_Sum.csv',index_col=index_col)
+    df[[f'CHARGEQ_{i}' for i in range(48)]].to_csv(f'{outputDir}/Algorithm_Output_ChargeQ.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_ChargeQ.csv')
-    df[[f'ADDRMAP_{i}' for i in range(48)]].to_csv(f'{outputDir}/Algorithm_Output_AddrMap.csv')
+    df[[f'ADDRMAP_{i}' for i in range(48)]].to_csv(f'{outputDir}/Algorithm_Output_AddrMap.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_AddrMap.csv')
-    df[['SUM']].to_csv(f'{outputDir}/Algorithm_Output_Sum.csv')
+    df[['SUM']].to_csv(f'{outputDir}/Algorithm_Output_Sum.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_Sum.csv')
-    df[['SUM_NOT_TRANSMITTED']].to_csv(f'{outputDir}/Algorithm_Output_SumNotTransmitted.csv')
+    df[['SUM_NOT_TRANSMITTED']].to_csv(f'{outputDir}/Algorithm_Output_SumNotTransmitted.csv', index=saveIndex, header=['SUMNOTTRANSMITTED'])
     NewFiles.append('Algorithm_Output_SumNotTransmitted.csv')
 
     #load and output STC data
-    df = pd.read_csv(f'{inputDir}/SuperTriggerCell.csv',index_col=['Orbit','BX'])
-    df[[f'XTC4_9_SUM_{i}' for i in range(12)]].to_csv(f'{outputDir}/Algorithm_Output_XTC4_9_Sum.csv')
+    df = pd.read_csv(f'{inputDir}/SuperTriggerCell.csv',index_col=index_col)
+    df[[f'XTC4_9_SUM_{i}' for i in range(12)]].to_csv(f'{outputDir}/Algorithm_Output_XTC4_9_Sum.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_XTC4_9_Sum.csv')
-    df[[f'XTC16_9_SUM_{i}' for i in range(3)]].to_csv(f'{outputDir}/Algorithm_Output_XTC16_9_Sum.csv')
+    df[[f'XTC16_9_SUM_{i}' for i in range(3)]].to_csv(f'{outputDir}/Algorithm_Output_XTC16_9_Sum.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_XTC16_9_Sum.csv')
-    df[[f'XTC4_7_SUM_{i}' for i in range(12)]].to_csv(f'{outputDir}/Algorithm_Output_XTC4_7_Sum.csv')
+    df[[f'XTC4_7_SUM_{i}' for i in range(12)]].to_csv(f'{outputDir}/Algorithm_Output_XTC4_7_Sum.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_XTC4_7_Sum.csv')
-    df[[f'MAX4_ADDR_{i}' for i in range(12)]].to_csv(f'{outputDir}/Algorithm_Output_MAX4_Addr.csv')
+    df[[f'MAX4_ADDR_{i}' for i in range(12)]].to_csv(f'{outputDir}/Algorithm_Output_MAX4_Addr.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_MAX4_Addr.csv')
-    df[[f'MAX16_ADDR_{i}' for i in range(3)]].to_csv(f'{outputDir}/Algorithm_Output_MAX16_Addr.csv')
+    df[[f'MAX16_ADDR_{i}' for i in range(3)]].to_csv(f'{outputDir}/Algorithm_Output_MAX16_Addr.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_MAX16_Addr.csv')
 
     #BestChoice
-    df = pd.read_csv(f'{inputDir}/BestChoice.csv',index_col=['Orbit','BX'])
-    df[[f'BC_CHARGE_{i}' for i in range(48)]].to_csv(f'{outputDir}/Algorithm_Output_BC_Charge.csv')
+    df = pd.read_csv(f'{inputDir}/BestChoice.csv',index_col=index_col)
+    df[[f'BC_CHARGE_{i}' for i in range(48)]].to_csv(f'{outputDir}/Algorithm_Output_BC_Charge.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_BC_Charge.csv')
-    df[[f'BC_TC_MAP_{i}' for i in range(48)]].to_csv(f'{outputDir}/Algorithm_Output_BC_TC_map.csv')
+    df[[f'BC_TC_MAP_{i}' for i in range(48)]].to_csv(f'{outputDir}/Algorithm_Output_BC_TC_map.csv', index=saveIndex)
     NewFiles.append('Algorithm_Output_BC_TC_map.csv')
 
     #Repeater just needs to be copied
@@ -139,11 +146,17 @@ def AlgoTestBench(inputDir, outputDir):
 def FormatBuffer(inputDir, outputDir):
     NewFiles = []
     #copy registers 
-    shutil.copy(f'{inputDir}/TxSyncWord.csv', f'{outputDir}/Formatter_Buffer_Input_Tx_Sync_Word.csv')
-    NewFiles.append('Formatter_Buffer_Input_Tx_Sync_Word.csv')
+    shutil.copy(f'{inputDir}/TxSyncWord.csv', f'{outputDir}/Formatter_Buffer_Input_TxSyncWord.csv')
+    NewFiles.append('Formatter_Buffer_Input_TxSyncWord.csv')
 
     shutil.copy(f'{inputDir}/EPORTTX_NUMEN.csv', f'{outputDir}/Formatter_Buffer_Input_EPortTx_NumEn.csv')
     NewFiles.append('Formatter_Buffer_Input_EPortTx_NumEn.csv')
+
+    shutil.copy(f'{inputDir}/STC_TYPE.csv', f'{outputDir}/Formatter_Buffer_Input_STC_Type.csv')
+    NewFiles.append('Formatter_Buffer_Input_STC_Type.csv')
+
+    shutil.copy(f'{inputDir}/Use_Sum.csv', f'{outputDir}/Formatter_Buffer_Input_Use_Sum.csv')
+    NewFiles.append('Formatter_Buffer_Input_Use_Sum.csv')
 
     shutil.copy(f'{inputDir}/Buffer_Threshold_T1.csv', f'{outputDir}/Formatter_Buffer_Input_Buffer_Threshold_T1.csv')
     NewFiles.append('Formatter_Buffer_Input_Buffer_Threshold_T1.csv')
@@ -154,30 +167,74 @@ def FormatBuffer(inputDir, outputDir):
     shutil.copy(f'{inputDir}/Buffer_Threshold_T1.csv', f'{outputDir}/Formatter_Buffer_Input_Buffer_Threshold_T3.csv')
     NewFiles.append('Formatter_Buffer_Input_Buffer_Threshold_T3.csv')
 
+    df = pd.read_csv(f'{inputDir}/LinkResetEconT.csv')
+    df.to_csv(f'{outputDir}/Formatter_Buffer_Input_Buffer_link_reset_econt.csv',index=saveIndex,header=['LINK_RESET'])
+    NewFiles.append('Formatter_Buffer_Input_Buffer_link_reset_econt.csv')
+
     #header file and algo type
-    df = pd.read_csv(f'{inputDir}/BX_CNT.csv',index_col=['Orbit','BX'])
+    df = pd.read_csv(f'{inputDir}/BX_CNT.csv',index_col=index_col)
     df.columns = ['HEADER']
-    df.to_csv(f'{outputDir}/Formatter_Buffer_Input_Header.csv')
+    df.to_csv(f'{outputDir}/Formatter_Buffer_Input_Header.csv', index=saveIndex)
     NewFiles.append('Formatter_Buffer_Input_Header.csv')
 
-    df = pd.read_csv(f'{inputDir}/Buffer_TS.csv',index_col=['Orbit','BX'])
-    df[[f'TX_DATA_{i}' for i in range(14)]].to_csv(f'{outputDir}/Formatter_Buffer_Output_ePortTx_DataIn_TS.csv')
+    df = pd.read_csv(f'{inputDir}/Buffer_TS.csv',index_col=index_col)
+    df[[f'TX_DATA_{i}' for i in range(14)]].to_csv(f'{outputDir}/Formatter_Buffer_Output_ePortTx_DataIn_TS.csv', index=saveIndex)
     NewFiles.append('Formatter_Buffer_Output_ePortTx_DataIn_TS.csv')
 
-    df = pd.read_csv(f'{inputDir}/Buffer_STC.csv',index_col=['Orbit','BX'])
-    df[[f'TX_DATA_{i}' for i in range(14)]].to_csv(f'{outputDir}/Formatter_Buffer_Output_ePortTx_DataIn_STC.csv')
+    df = pd.read_csv(f'{inputDir}/Buffer_STC.csv',index_col=index_col)
+    df[[f'TX_DATA_{i}' for i in range(14)]].to_csv(f'{outputDir}/Formatter_Buffer_Output_ePortTx_DataIn_STC.csv', index=saveIndex)
     NewFiles.append('Formatter_Buffer_Output_ePortTx_DataIn_STC.csv')
 
-    df = pd.read_csv(f'{inputDir}/Buffer_BC.csv',index_col=['Orbit','BX'])
-    df[[f'TX_DATA_{i}' for i in range(14)]].to_csv(f'{outputDir}/Formatter_Buffer_Output_ePortTx_DataIn_BC.csv')
+    df = pd.read_csv(f'{inputDir}/Buffer_BC.csv',index_col=index_col)
+    df[[f'TX_DATA_{i}' for i in range(14)]].to_csv(f'{outputDir}/Formatter_Buffer_Output_ePortTx_DataIn_BC.csv', index=saveIndex)
     NewFiles.append('Formatter_Buffer_Output_ePortTx_DataIn_BC.csv')
 
-    df = pd.read_csv(f'{inputDir}/Buffer_RPT.csv',index_col=['Orbit','BX'])
-    df[[f'TX_DATA_{i}' for i in range(14)]].to_csv(f'{outputDir}/Formatter_Buffer_Output_ePortTx_DataIn_RPT.csv')
+    df = pd.read_csv(f'{inputDir}/Buffer_RPT.csv',index_col=index_col)
+    df[[f'TX_DATA_{i}' for i in range(14)]].to_csv(f'{outputDir}/Formatter_Buffer_Output_ePortTx_DataIn_RPT.csv', index=saveIndex)
     NewFiles.append('Formatter_Buffer_Output_ePortTx_DataIn_RPT.csv')
 
-    pd.DataFrame(0,columns=['OVFLW'],index=df.index).to_csv(f'{outputDir}/Formatter_Buffer_Output_error.csv')
+    pd.DataFrame(0,columns=['OVFLW'],index=df.index).to_csv(f'{outputDir}/Formatter_Buffer_Output_error.csv', index=saveIndex)
     NewFiles.append('Formatter_Buffer_Output_error.csv')
+
+    #Make Algo Type csv's
+    pd.DataFrame(0,columns=['ALGORITHM_TYPE'],index=df.index).to_csv(f'{outputDir}/Formatter_Buffer_Input_Algorithm_Type_TS.csv', index=saveIndex)
+    NewFiles.append('Formatter_Buffer_Input_Algorithm_Type_TS.csv')
+    pd.DataFrame(1,columns=['ALGORITHM_TYPE'],index=df.index).to_csv(f'{outputDir}/Formatter_Buffer_Input_Algorithm_Type_STC.csv', index=saveIndex)
+    NewFiles.append('Formatter_Buffer_Input_Algorithm_Type_STC.csv')
+    pd.DataFrame(2,columns=['ALGORITHM_TYPE'],index=df.index).to_csv(f'{outputDir}/Formatter_Buffer_Input_Algorithm_Type_BC.csv', index=saveIndex)
+    NewFiles.append('Formatter_Buffer_Input_Algorithm_Type_BC.csv')
+    pd.DataFrame(3,columns=['ALGORITHM_TYPE'],index=df.index).to_csv(f'{outputDir}/Formatter_Buffer_Input_Algorithm_Type_RPT.csv', index=saveIndex)
+    NewFiles.append('Formatter_Buffer_Input_Algorithm_Type_RPT.csv')
+
+    for ALGO in ['TS','BC','STC','RPT']:
+        df = pd.read_csv(f'{inputDir}/Format_{ALGO}.csv',index_col=index_col)
+
+        df[[f'FRAMEQ_{i}' for i in range(25,-1,-1)]].to_csv(f'{outputDir}/Formatter_Buffer_Input_FrameQ_{ALGO}.csv',index=saveIndex,header=[f'BUF_INP_FRMQ_{i}' for i in range(25,-1,-1)])
+        NewFiles.append(f'Formatter_Buffer_Input_FrameQ_{ALGO}.csv')
+
+        df[['FRAMEQ_NUMW']].to_csv(f'{outputDir}/Formatter_Buffer_Input_FrameQ_NumW_{ALGO}.csv',index=saveIndex,header=['BUF_INP_FRMQ_NUMW'])
+        NewFiles.append(f'Formatter_Buffer_Input_FrameQ_NumW_{ALGO}.csv')
+
+        df[['IdleWord']*25 + ['FRAMEQ_NUMW']].to_csv(f'{outputDir}/Formatter_Buffer_Input_FrameQTruncated_{ALGO}.csv',index=saveIndex,header=[f'BUF_INP_FRMQT_{i}' for i in range(25,-1,-1)])
+        NewFiles.append(f'Formatter_Buffer_Input_FrameQTruncated_{ALGO}.csv')
+
+        df[[f'FRAMEQ_{i}' for i in range(26)]].to_csv(f'{outputDir}/Formatter_Buffer_Output_FrameQ_{ALGO}.csv',index=saveIndex,header=[f'FMT_OUT_FRMQ_{i}' for i in range(26)])
+        NewFiles.append(f'Formatter_Buffer_Output_FrameQ_{ALGO}.csv')
+
+        df[['FRAMEQ_NUMW']].to_csv(f'{outputDir}/Formatter_Buffer_Output_FrameQ_NumW_{ALGO}.csv',index=saveIndex,header=['FMT_OUT_FRMQ_NUMW'])
+        NewFiles.append(f'Formatter_Buffer_Output_FrameQ_NumW_{ALGO}.csv')
+
+        df[['FRAMEQ_NUMW','IdleWord']].to_csv(f'{outputDir}/Formatter_Buffer_Output_FrameQTruncated_{ALGO}.csv',index=saveIndex,header=['FMT_OUT_FRMQT_0','FMT_OUT_FRMQT_1'])
+        NewFiles.append(f'Formatter_Buffer_Output_FrameQTruncated_{ALGO}.csv')
+
+
+    #create dummy files for the auto encoder
+    dfAE = pd.DataFrame(dict({f'AE_BYTE{i}':0 for i in range(20)},**{f'MAE_BYTE{i}':0 for i in range(18)}), index=df.index)
+    dfAE[[f'AE_BYTE{i}' for i in range(20)]].to_csv(f'{outputDir}/Formatter_Buffer_Input_outEncoder.csv',index=saveIndex)
+    NewFiles.append('Formatter_Buffer_Input_outEncoder.csv')
+    dfAE[[f'MAE_BYTE{i}' for i in range(18)]].to_csv(f'{outputDir}/Formatter_Buffer_Input_mask_auto_encoder.csv',index=saveIndex)
+    NewFiles.append('Formatter_Buffer_Input_mask_auto_encoder.csv')
+
 
     #update file contents to leave space after comma in csv
     addSpaceToCSV(outputDir, NewFiles)
@@ -196,10 +253,6 @@ def FormatBuffer(inputDir, outputDir):
                  ['Algorithm_Output_BC_TC_map.csv', 'Formatter_Buffer_Input_BC_TC_map.csv'],
                  ['Algorithm_Output_RepeaterQ.csv', 'Formatter_Buffer_Input_RepeaterQ.csv'],
                  ['Algorithm_Output_Header.csv', 'Formatter_Buffer_Input_Header.csv'],
-                 ['Algorithm_Input_Type_TS.csv', 'Formatter_Buffer_Input_Type_TS.csv'],
-                 ['Algorithm_Input_Type_STC.csv', 'Formatter_Buffer_Input_Type_STC.csv'],
-                 ['Algorithm_Input_Type_BC.csv', 'Formatter_Buffer_Input_Type_BC.csv'],
-                 ['Algorithm_Input_Type_RPT.csv', 'Formatter_Buffer_Input_Type_RPT.csv'],
              ]
 
     for fSrc, fDest in linkFiles:

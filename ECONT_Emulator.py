@@ -12,6 +12,7 @@ import numpy as np
 
 from Utils.linkAllocation import linksPerLayer
 
+saveIndex=False
 
 from ASICBlocks.LoadData_ePortRX import loadMetaData, loadEportRXData, splitEportRXData
 from ASICBlocks.MuxFixCalib import getMuxRegisters, Mux, FloatToFix, getCalibrationRegisters_Thresholds, Calibrate
@@ -45,19 +46,19 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
         print(df_CALQ)
         print(df_SimEnergyStatus)
         df_CALQ['SimEnergyPresent'] = df_SimEnergyStatus[['SimEnergyPresent']].values
-        df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=True)
+        df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=saveIndex)
         df_CALQ.drop('SimEnergyPresent',axis=1,inplace=True)
     else:
-        df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=True)
+        df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=saveIndex)
 
     if StopAtAlgoBlock: return
 
     print('Algorithm')
-    df_BX_CNT.to_csv(f'{outputDir}/BX_CNT.csv',index=True)
-    df_ePortRxDataGroup.to_csv(f'{outputDir}/ePortRxDataGroup.csv',index=True)
-    df_Mux_in.to_csv(f'{outputDir}/Mux_in.csv',index=True)
-    df_Mux_out.to_csv(f'{outputDir}/Mux_out.csv',index=True)
-    df_F2F.to_csv(f'{outputDir}/F2F.csv',index=True)
+    df_BX_CNT.to_csv(f'{outputDir}/BX_CNT.csv',index=saveIndex)
+    df_ePortRxDataGroup.to_csv(f'{outputDir}/ePortRxDataGroup.csv',index=saveIndex)
+    df_Mux_in.to_csv(f'{outputDir}/Mux_in.csv',index=saveIndex)
+    df_Mux_out.to_csv(f'{outputDir}/Mux_out.csv',index=saveIndex)
+    df_F2F.to_csv(f'{outputDir}/F2F.csv',index=saveIndex)
     del df_ePortRxDataGroup
     del df_Mux_in
     del df_Mux_out
@@ -89,40 +90,46 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
         STC_TYPE = STC_Type
 
 
-    pd.DataFrame([Mux_Select], columns=[f'MUX_SELECT_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/Mux_Select.csv', index=True)
-    pd.DataFrame([CALVALUE_Registers], columns=[f'CALVALUE_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/CALVALUE.csv', index=True)
-    pd.DataFrame([THRESHV_Registers], columns=[f'THRESHV_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/THRESHV.csv', index=True)
-    pd.DataFrame([[DropLSB]], columns=['DROP_LSB'],index=df_CALQ.index).to_csv(f'{outputDir}/DropLSB.csv', index=True)
-    pd.DataFrame([[int(isHDM)]], columns=['HIGH_DENSITY'],index=df_CALQ.index).to_csv(f'{outputDir}/HighDensity.csv', index=True)
-    pd.DataFrame([[TxSyncWord]], columns=['TX_SYNC_WORD'],index=df_CALQ.index).to_csv(f'{outputDir}/TxSyncWord.csv', index=True)
-    pd.DataFrame([[EPORTTX_NUMEN]], columns=['EPORT_TX_NUMEN'],index=df_CALQ.index).to_csv(f'{outputDir}/EPORTTX_NUMEN.csv', index=True)
-    pd.DataFrame([[STC_TYPE]], columns=['STC_TYPE'],index=df_CALQ.index).to_csv(f'{outputDir}/STC_TYPE.csv', index=True)
-    pd.DataFrame([[Use_Sum]], columns=['USE_SUM'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=True)
+    pd.DataFrame([Mux_Select], columns=[f'MUX_SELECT_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/Mux_Select.csv', index=saveIndex)
+    pd.DataFrame([CALVALUE_Registers], columns=[f'CALVALUE_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/CALVALUE.csv', index=saveIndex)
+    pd.DataFrame([THRESHV_Registers], columns=[f'THRESHV_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/THRESHV.csv', index=saveIndex)
+    pd.DataFrame([[DropLSB]], columns=['DROP_LSB'],index=df_CALQ.index).to_csv(f'{outputDir}/DropLSB.csv', index=saveIndex)
+    pd.DataFrame([[int(isHDM)]], columns=['HIGH_DENSITY'],index=df_CALQ.index).to_csv(f'{outputDir}/HighDensity.csv', index=saveIndex)
+    pd.DataFrame([[TxSyncWord]], columns=['TX_SYNC_WORD'],index=df_CALQ.index).to_csv(f'{outputDir}/TxSyncWord.csv', index=saveIndex)
+    pd.DataFrame([[EPORTTX_NUMEN]], columns=['EPORT_TX_NUMEN'],index=df_CALQ.index).to_csv(f'{outputDir}/EPORTTX_NUMEN.csv', index=saveIndex)
+    pd.DataFrame([[STC_TYPE]], columns=['STC_TYPE'],index=df_CALQ.index).to_csv(f'{outputDir}/STC_TYPE.csv', index=saveIndex)
+    pd.DataFrame([[Use_Sum]], columns=['USE_SUM'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=saveIndex)
 
     BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*12*2
     BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*12*2-25
     BUFFER_THRESHOLD_T3 = 25
 
-    pd.DataFrame([[int(BUFFER_THRESHOLD_T1)]], columns=['BUFFER_THRESHOLD_T1'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T1.csv', index=True)
-    pd.DataFrame([[int(BUFFER_THRESHOLD_T2)]], columns=['BUFFER_THRESHOLD_T2'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T2.csv', index=True)
-    pd.DataFrame([[int(BUFFER_THRESHOLD_T3)]], columns=['BUFFER_THRESHOLD_T3'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T3.csv', index=True)
+    pd.DataFrame([[int(BUFFER_THRESHOLD_T1)]], columns=['BUFFER_THRESHOLD_T1'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T1.csv', index=saveIndex)
+    pd.DataFrame([[int(BUFFER_THRESHOLD_T2)]], columns=['BUFFER_THRESHOLD_T2'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T2.csv', index=saveIndex)
+    pd.DataFrame([[int(BUFFER_THRESHOLD_T3)]], columns=['BUFFER_THRESHOLD_T3'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T3.csv', index=saveIndex)
 
 
     df_Threshold_Sum, df_BestChoice, df_SuperTriggerCell, df_Repeater = Algorithms(df_CALQ, THRESHV_Registers, DropLSB)
     del df_CALQ
 
 
-    df_Threshold_Sum.to_csv(f'{outputDir}/Threshold_Sum.csv',index=True)
-    df_BestChoice.to_csv(f'{outputDir}/BestChoice.csv',index=True)
-    df_SuperTriggerCell.to_csv(f'{outputDir}/SuperTriggerCell.csv',index=True)
-    df_Repeater.to_csv(f'{outputDir}/Repeater.csv',index=True)
+    df_Threshold_Sum.to_csv(f'{outputDir}/Threshold_Sum.csv',index=saveIndex)
+    df_BestChoice.to_csv(f'{outputDir}/BestChoice.csv',index=saveIndex)
+    df_SuperTriggerCell.to_csv(f'{outputDir}/SuperTriggerCell.csv',index=saveIndex)
+    df_Repeater.to_csv(f'{outputDir}/Repeater.csv',index=saveIndex)
+
+    try:
+        df_linkReset = pd.read_csv(f'{inputDir}/LinkResetEconT.csv')
+    except:
+        df_linkReset = pd.DataFrame({'LINKRESETECONT':[0]*N},index=df_CALQ.index)
+
 
     print('Formatter/Buffer Threshold-Sum')
     df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum)
     df_BufferOutput_TS  = Buffer(df_Format_TS,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Threshold_Sum
-    df_Format_TS.to_csv(f'{outputDir}/Format_TS.csv',index=True)
-    df_BufferOutput_TS.to_csv(f'{outputDir}/Buffer_TS.csv',index=True)
+    df_Format_TS.to_csv(f'{outputDir}/Format_TS.csv',index=saveIndex)
+    df_BufferOutput_TS.to_csv(f'{outputDir}/Buffer_TS.csv',index=saveIndex)
     del df_Format_TS
     del df_BufferOutput_TS
 
@@ -130,8 +137,8 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum)
     df_BufferOutput_BC  = Buffer(df_Format_BC,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_BestChoice
-    df_Format_BC.to_csv(f'{outputDir}/Format_BC.csv',index=True)
-    df_BufferOutput_BC.to_csv(f'{outputDir}/Buffer_BC.csv',index=True)
+    df_Format_BC.to_csv(f'{outputDir}/Format_BC.csv',index=saveIndex)
+    df_BufferOutput_BC.to_csv(f'{outputDir}/Buffer_BC.csv',index=saveIndex)
     del df_Format_BC
     del df_BufferOutput_BC
 
@@ -139,8 +146,8 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     df_Format_STC = Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord)
     df_BufferOutput_STC = Buffer(df_Format_STC, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_SuperTriggerCell
-    df_Format_STC.to_csv(f'{outputDir}/Format_STC.csv',index=True)
-    df_BufferOutput_STC.to_csv(f'{outputDir}/Buffer_STC.csv',index=True)
+    df_Format_STC.to_csv(f'{outputDir}/Format_STC.csv',index=saveIndex)
+    df_BufferOutput_STC.to_csv(f'{outputDir}/Buffer_STC.csv',index=saveIndex)
     del df_Format_STC
     del df_BufferOutput_STC
 
@@ -148,8 +155,8 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     df_Format_RPT = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord)    
     df_BufferOutput_RPT = Buffer(df_Format_RPT, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Repeater
-    df_Format_RPT.to_csv(f'{outputDir}/Format_RPT.csv',index=True)
-    df_BufferOutput_RPT.to_csv(f'{outputDir}/Buffer_RPT.csv',index=True)
+    df_Format_RPT.to_csv(f'{outputDir}/Format_RPT.csv',index=saveIndex)
+    df_BufferOutput_RPT.to_csv(f'{outputDir}/Buffer_RPT.csv',index=saveIndex)
     del df_Format_RPT
     del df_BufferOutput_RPT
 

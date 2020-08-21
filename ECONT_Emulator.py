@@ -95,8 +95,8 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     pd.DataFrame([THRESHV_Registers], columns=[f'THRESHV_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/THRESHV.csv', index=saveIndex)
     pd.DataFrame([[DropLSB]], columns=['DROP_LSB'],index=df_CALQ.index).to_csv(f'{outputDir}/DropLSB.csv', index=saveIndex)
     pd.DataFrame([[int(isHDM)]], columns=['HIGH_DENSITY'],index=df_CALQ.index).to_csv(f'{outputDir}/HighDensity.csv', index=saveIndex)
-    pd.DataFrame([[TxSyncWord]], columns=['TX_SYNC_WORD'],index=df_CALQ.index).to_csv(f'{outputDir}/TxSyncWord.csv', index=saveIndex)
-    pd.DataFrame([[EPORTTX_NUMEN]], columns=['EPORT_TX_NUMEN'],index=df_CALQ.index).to_csv(f'{outputDir}/EPORTTX_NUMEN.csv', index=saveIndex)
+    pd.DataFrame([[TxSyncWord]], columns=['TXSYNCWORD'],index=df_CALQ.index).to_csv(f'{outputDir}/TxSyncWord.csv', index=saveIndex)
+    pd.DataFrame([[EPORTTX_NUMEN]], columns=['EPORTTX_NUMEN'],index=df_CALQ.index).to_csv(f'{outputDir}/EPORTTX_NUMEN.csv', index=saveIndex)
     pd.DataFrame([[STC_TYPE]], columns=['STC_TYPE'],index=df_CALQ.index).to_csv(f'{outputDir}/STC_TYPE.csv', index=saveIndex)
     pd.DataFrame([[Use_Sum]], columns=['USE_SUM'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=saveIndex)
 

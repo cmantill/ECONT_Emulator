@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 from Utils.encode import encode
 
-def splitToWords(row, N=16,totalWords=28):
+MAX_EPORTTX=13
+
+def splitToWords(row, N=16,totalWords=26):
     fullData = row['FullDataString']
     
     words = [int(fullData[i*N:(i+1)*N],2) for i in range(int(len(fullData)/N))]
@@ -12,16 +14,60 @@ def splitToWords(row, N=16,totalWords=28):
 
     return words
 
+Threshold_WordsPerNTCQ = {8  : 8 ,
+                          9  : 8 ,
+                          10 : 9 ,
+                          11 : 9 ,
+                          12 : 10,
+                          13 : 10,
+                          14 : 11,
+                          15 : 11,
+                          16 : 11,
+                          17 : 12,
+                          18 : 12,
+                          19 : 13,
+                          20 : 13,
+                          21 : 14,
+                          22 : 14,
+                          23 : 15,
+                          24 : 15,
+                          25 : 15,
+                          26 : 16,
+                          27 : 16,
+                          28 : 17,
+                          29 : 17,
+                          30 : 18,
+                          31 : 18,
+                          32 : 18,
+                          33 : 19,
+                          34 : 19,
+                          35 : 20,
+                          36 : 20,
+                          37 : 21,
+                          38 : 21,
+                          39 : 21,
+                          40 : 22,
+                          41 : 22,
+                          42 : 23,
+                          43 : 23,
+                          44 : 24,
+                          45 : 24,
+                          46 : 25,
+                          47 : 25,
+                          48 : 25,
+                      }
+                          
 def formatThresholdOutput(row,TxSynchWord=0, Use_Sum=False, debug=False):
 
     SUM_FULL =row['SUM']
     SUM_NOT_TRANSMITTED =row['SUM_NOT_TRANSMITTED']
     CHARGEQ = row[[f'CHARGEQ_{i}' for i in range(48)]].values
-    CHARGEQ=CHARGEQ[CHARGEQ>0]      ## remove zeros
 
     ADD_MAP  = row[[f'ADDRMAP_{i}' for i in range(48)]]
             
     NTCQ=sum(ADD_MAP)
+
+    # CHARGEQ=CHARGEQ[:NTCQ]      ## remove zeros
 
     bx_cnt = row['BX_CNT']
     header =  format(bx_cnt, '#0%ib'%(7))[2:]
@@ -30,9 +76,9 @@ def formatThresholdOutput(row,TxSynchWord=0, Use_Sum=False, debug=False):
     if NTCQ==0: 
         dataType='000'
     elif NTCQ<8:
-        dataType='001'
-    else:
         dataType='010'
+    else:
+        dataType='100'
 
     if Use_Sum:
         modSumData = format(SUM_FULL, '#010b')[2:]
@@ -54,7 +100,7 @@ def formatThresholdOutput(row,TxSynchWord=0, Use_Sum=False, debug=False):
         for x in channelNumbersBin: AddressMapData += x
         
         ChargeData = ''
-        for x in CHARGEQ:
+        for x in CHARGEQ[:NTCQ]:
             ChargeData += format(x, '#0%ib'%(9))[2:]
     else:
         nChannelData=''
@@ -64,6 +110,12 @@ def formatThresholdOutput(row,TxSynchWord=0, Use_Sum=False, debug=False):
             ChargeData += format(x, '#0%ib'%(9))[2:]
 
     formattedData = header + dataType + modSumData + extraBit + nChannelData + AddressMapData + ChargeData
+
+
+    #Pads with beginning of next ChargeQ value, instead of 0's
+    if NTCQ>=8:
+        formattedData = formattedData[0:16*Threshold_WordsPerNTCQ[NTCQ]]
+
     if len(formattedData)%16==0:
         nPadBits=0
         paddedData = formattedData
@@ -76,7 +128,7 @@ def formatThresholdOutput(row,TxSynchWord=0, Use_Sum=False, debug=False):
     else:
         return [header, dataType , modSumData, extraBit ,nChannelData , len(AddressMapData) , len(ChargeData)]
 
-def formatThresholdTruncatedOutput(row):
+def formatTruncatedOutput(row):
 
     header =  format(row['BX_CNT'], '#0%ib'%(7))[2:]
 
@@ -100,13 +152,14 @@ def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum):
 
     df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
 
-    frameQ_headers = [f'FRAMEQ_{i}' for i in range(28)]
+    frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
     df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
 
-    df_Format['FRAMEQ_Truncated'] = df_in.apply(formatThresholdTruncatedOutput,axis=1)
+    df_Format['FRAMEQ_Truncated_0'] = df_in.apply(formatTruncatedOutput,axis=1)
+    df_Format['FRAMEQ_Truncated_1'] = df_Format.IdleWord
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated','IdleWord']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
 
 
 def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
@@ -189,13 +242,14 @@ def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_S
 
     df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
 
-    frameQ_headers = [f'FRAMEQ_{i}' for i in range(28)]
+    frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
     df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
 
-    df_Format['FRAMEQ_Truncated'] = 0
+    df_Format['FRAMEQ_Truncated_0'] = 0
+    df_Format['FRAMEQ_Truncated_1'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated','IdleWord']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
 
 
 
@@ -357,13 +411,14 @@ def Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_
         
     df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
 
-    frameQ_headers = [f'FRAMEQ_{i}' for i in range(28)]
+    frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
     df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
 
-    df_Format['FRAMEQ_Truncated'] = 0
+    df_Format['FRAMEQ_Truncated_0'] = 0
+    df_Format['FRAMEQ_Truncated_1'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated','IdleWord']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
 
 
 def formatRepeaterOutput(row,debug=False):
@@ -391,10 +446,11 @@ def Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord):
 
     df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
 
-    frameQ_headers = [f'FRAMEQ_{i}' for i in range(28)]
+    frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
     df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
 
-    df_Format['FRAMEQ_Truncated'] = 0
+    df_Format['FRAMEQ_Truncated_0'] = 0
+    df_Format['FRAMEQ_Truncated_1'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated','IdleWord']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]

@@ -11,7 +11,7 @@ import glob
 from ECONT_Emulator import runEmulator
 from VerificationData import makeVerificationData
 
-allowedFastCommands = ['ocr','bcr','chipsync','linkreset']
+allowedFastCommands = ['ocr','bcr','chipsync','linkresetecont','linkresetroct']
 
 def parseConfig(configName):
     offsetChanges = []
@@ -224,6 +224,7 @@ if __name__=='__main__':
     parser.add_argument('-o',"--output", default = None ,dest="outputDir", required=True, help="directory name for output verification data")
     parser.add_argument('-c','--config', default = None, dest='configFile', help='configuration file from which to read the changes (default: None)')
     parser.add_argument('-N', type=int, default = -1,dest="N", help="Number of BX to use, -1 is all in input (default: -1)")
+    parser.add_argument('-L', type=int, default = -1,dest="NLinks", help="Number of ePortTX links to use, -1 is all in input (default: -1)")
     parser.add_argument('--counterReset', type=int, default = 0,dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 0)")
 
 
@@ -241,7 +242,7 @@ if __name__=='__main__':
                                                           ORBSYN_CNT_LOAD_VAL=args.ORBSYN_CNT_LOAD_VAL,
                                                           makeOffsetChange=False)
 
-    runEmulator(tempOutputDir)
+    runEmulator(tempOutputDir, ePortTx=args.NLinks)
 
     makeVerificationData(tempOutputDir, args.outputDir)
 

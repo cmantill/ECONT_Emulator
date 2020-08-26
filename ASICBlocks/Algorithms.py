@@ -12,7 +12,11 @@ def makeCHARGEQ(row, nDropBit=1):
 
     asInt  = True
     
-    raw_charges     = np.array(row.values[row.values>0]).astype(int)
+    CALQ = row[[f'CALQ_{i}' for i in range(48)]].values
+
+    nDropBit = row['DropLSB']
+
+    raw_charges     = np.array(CALQ[CALQ>0]).astype(int)
     if len(raw_charges)>0:
         encoded_charges = encodeV(raw_charges,nDropBit,nExp,nMant,roundBits,asInt=True)
     else:
@@ -24,14 +28,22 @@ def makeCHARGEQ(row, nDropBit=1):
 def ThresholdSum(df_CALQ, THRESHV_Registers, DropLSB):
     ADD_MAP_Headers = [f'ADDRMAP_{i}' for i in range(48)]
     CHARGEQ_Headers = [f'CHARGEQ_{i}' for i in range(48)]
+    if type(THRESHV_Registers) is pd.DataFrame:
+        thresholds = THRESHV_Registers.values
+    else:
+        thresholds = THRESHV_Registers
 
-    df_Threshold_Sum = (df_CALQ>=THRESHV_Registers).astype(int)
+    df_Threshold_Sum = (df_CALQ>=thresholds).astype(int)
     df_Threshold_Sum.columns = ADD_MAP_Headers
 
-    qlist = ((df_CALQ>=THRESHV_Registers).astype(int)*df_CALQ).apply(makeCHARGEQ, nDropBit=DropLSB,axis=1)
+
+    df_in = (df_CALQ>=thresholds).astype(int)*df_CALQ
+    df_in['DropLSB'] = DropLSB
+
+    qlist = df_in.apply(makeCHARGEQ,axis=1)
     df_Threshold_Sum[CHARGEQ_Headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_Headers)
     df_Threshold_Sum['SUM'] = encodeV((df_CALQ).sum(axis=1),0,5,3,False,True)
-    df_Threshold_Sum['SUM_NOT_TRANSMITTED'] = encodeV(((df_CALQ<THRESHV_Registers)*df_CALQ).sum(axis=1),0,5,3,False,True)
+    df_Threshold_Sum['SUM_NOT_TRANSMITTED'] = encodeV(((df_CALQ<thresholds)*df_CALQ).sum(axis=1),0,5,3,False,True)
 
     return df_Threshold_Sum
 
@@ -40,7 +52,7 @@ def ThresholdSum(df_CALQ, THRESHV_Registers, DropLSB):
 from .bestchoice import sort, batcher_sort
 
 def BestChoice(df_CALQ, DropLSB):
-    df_in = pd.DataFrame(df_CALQ.values>>DropLSB,columns=df_CALQ.columns, index=df_CALQ.index)
+    df_in = pd.DataFrame(df_CALQ.values>>DropLSB.values,columns=df_CALQ.columns, index=df_CALQ.index)
 
     df_sorted, _ = sort(df_in)
     df_sorted_index = pd.DataFrame(df_in.apply(batcher_sort, axis=1))
@@ -87,7 +99,9 @@ def SuperTriggerCell(df_CALQ):
 
 def Repeater(df_CALQ, DropLSB):
 
-    df_Repeater = df_CALQ.apply(encodeV,args=(DropLSB,4,3,False,True))
+    df_in = pd.DataFrame(df_CALQ.values>>DropLSB.values,columns=df_CALQ.columns, index=df_CALQ.index)
+
+    df_Repeater = df_in.apply(encodeV,args=(0,4,3,False,True))
     
     df_Repeater.columns = [f'RPT_{i}' for i in range(48)]
     
@@ -96,6 +110,15 @@ def Repeater(df_CALQ, DropLSB):
 
 
 def Algorithms(df_CALQ, THRESHV_Registers, DropLSB):
+    if not type(DropLSB) is pd.DataFrame:
+        if type(DropLSB) is int:
+            DropLSB = pd.DataFrame({'DropLSB':DropLSB},index=df_CALQ.index)
+        else:
+            print(f'DropLSB can only be of type int of dataframe, not {type(DropLSB)}')
+            exit()
+
+    DropLSB.loc[DropLSB.DropLSB>4] = 0
+
     df_Threshold_Sum = ThresholdSum(df_CALQ, THRESHV_Registers, DropLSB)
     
     df_BestChoice = BestChoice(df_CALQ, DropLSB)

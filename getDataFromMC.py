@@ -54,7 +54,7 @@ def packIntoInputLinks(row):
     
     return LINK
 
-def processTree(_tree, geomDF, subdet, layer, geomVersion="v9", jobNumber=0, nEvents=-1, nStart=-1):
+def processTree(_tree, geomDF, subdet, layer, geomVersion="v11", jobNumber=0, nEvents=-1, nStart=-1):
 
     #load dataframe
     print('load dataframe')
@@ -280,7 +280,13 @@ def main(opt,args):
     subdet = opt.subdet
     layer = opt.layer
 
-    if opt.useV10 or opt.useV11:
+    geomVersion='v11'
+    if opt.useV10:
+        geomVersion='v10'
+    if opt.useV9:
+        geomVersion='v9'
+
+    if geomVersion in ['v10','v11']:
         if subdet==3:
             subdet=1
         if subdet==4:
@@ -297,20 +303,20 @@ def main(opt,args):
 
     if fileName is None:
         if fileNameContent is None:
-            if opt.useV10:
+            if geomVersion=='v10':
                 fileNameContent='ntuple_ttbar200PU_RelVal_job'
-            elif opt.useV11:
-                fileNameContent='ntuple_ttbar_ttbar_v11_aged_unbiased_20191101_'
-            else:
+            elif geomVersion=='v9':
                 fileNameContent='ntuple_hgcalNtuples_ttbar_200PU'
+            else:
+                fileNameContent='ntuple_ttbar_ttbar_v11_aged_unbiased_20191101_'
     
         if eosDir is None:
-            if opt.useV10:
+            if geomVersion=='v10':
                 eosDir = '/store/user/dnoonan/HGCAL_Concentrator/NewNtuples/v10_Geom'
-            elif opt.useV11:
-                eosDir = '/store/user/lpchgcal/ConcentratorNtuples/L1THGCal_Ntuples/TTbar_v11'
-            else:
+            elif geomVersion=='v9':
                 eosDir = '/store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar'
+            else:
+                eosDir = '/store/user/lpchgcal/ConcentratorNtuples/L1THGCal_Ntuples/TTbar_v11'
     
         fileList = []
         # get list of files
@@ -341,19 +347,15 @@ def main(opt,args):
     fileList = fileList[startFileNum:stopFileNum]
 
 
-    if opt.useV10 or opt.useV11:
-        geomVersion="v10"
-        if opt.useV11:
-            geomVersion="v11"
+    if geomVersion in ['v10','v11']:
         geomDF = getGeomDF_V10()
     else:
-        geomVersion="v9"
         geomDF = getGeomDF_V9()
 
     for i,fName in enumerate(fileList):
         print(i, fName)
         wafer = opt.wafer
-        if opt.useV10 or opt.useV11:
+        if geomVersion in ['v10','v11']:
             if not wafer==-1:
                 wafer = opt.waferu*100 + opt.waferv
         waferList = processNtupleInputs(fName, geomDF, subdet, layer, wafer, opt.odir, opt.Nevents, opt.chunkSize, geomVersion=geomVersion, appendFile=i>0, jobInfo=jobSplitText)
@@ -379,7 +381,7 @@ if __name__=='__main__':
     parser.add_option('--chunkSize', type=int, default = 100000 ,dest="chunkSize", help="Number of events to load from root file in a single chunk")
     parser.add_option('--jobSplit', type="string", default = "1/1" ,dest="jobSplit", help="Split of the input root files")
     parser.add_option("--v10", default = False, action='store_true',dest="useV10", help="use v10 geometry")
-    parser.add_option("--v11", default = False, action='store_true',dest="useV11", help="use v11 geometry")
+    parser.add_option("--v9", default = False, action='store_true',dest="useV9", help="use v9 geometry")
 
     (opt, args) = parser.parse_args()
 

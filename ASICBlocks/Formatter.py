@@ -261,6 +261,7 @@ def formatSTC_4_9(row, nSTC, debug=False):
     SumData = row[colsSUM].values
     IdxData = row[colsIDX].values
 
+    nBitsData = 9
     nBitsAddr = 2 
 
     #only a 4 bit header for STC
@@ -270,11 +271,11 @@ def formatSTC_4_9(row, nSTC, debug=False):
     
     STC_Data = ""
     for i in range(nSTC):
-        idxBits = format(IdxData[i], '#0%ib'%(4))[2:]
+        idxBits = format(IdxData[i], '#0%ib'%(nBitsAdd+2))[2:]
         STC_Data += idxBits
 
     for i in range(nSTC):
-        dataBits = format(SumData[i], '#0%ib'%(11))[2:]
+        dataBits = format(SumData[i], '#0%ib'%(nBitsData+2))[2:]
         STC_Data += dataBits
         
     formattedData = header + STC_Data
@@ -291,13 +292,14 @@ def formatSTC_4_9(row, nSTC, debug=False):
 
 def formatSTC_16_9(row, nSTC, debug=False):
     
-    colsSUM=[f'XTC16_9_SUM_{i}' for i in range(12)]
-    colsIDX=[f'MAX16_ADDR_{i}' for i in range(12)]
+    colsSUM=[f'XTC16_9_SUM_{i}' for i in range(3)]
+    colsIDX=[f'MAX16_ADDR_{i}' for i in range(3)]
 
     SumData = row[colsSUM].values
     IdxData = row[colsIDX].values
 
     nBitsAddr = 4 
+    nBitsData = 9
 
     #only a 4 bit header for STC
     bx_cnt = row['BX_CNT']
@@ -306,11 +308,11 @@ def formatSTC_16_9(row, nSTC, debug=False):
     
     STC_Data = ""
     for i in range(nSTC):
-        idxBits = format(IdxData[i], '#0%ib'%(6))[2:]
+        idxBits = format(IdxData[i], '#0%ib'%(nBitsAddr+2))[2:]
         STC_Data += idxBits
 
     for i in range(nSTC):
-        dataBits = format(SumData[i], '#0%ib'%(11))[2:]
+        dataBits = format(SumData[i], '#0%ib'%(nBitsData+2))[2:]
         STC_Data += dataBits
         
     formattedData = header + STC_Data
@@ -332,7 +334,8 @@ def formatSTC_4_7(row, nSTC, debug=False):
     SumData = row[colsSUM].values
     IdxData = row[colsIDX].values
 
-    nBitsAddr = 4 
+    nBitsAddr = 2
+    nBitsData = 7
 
     #only a 4 bit header for STC
     bx_cnt = row['BX_CNT']
@@ -341,11 +344,11 @@ def formatSTC_4_7(row, nSTC, debug=False):
     
     STC_Data = ""
     for i in range(nSTC):
-        idxBits = format(IdxData[i], '#0%ib'%(6))[2:]
+        idxBits = format(IdxData[i], '#0%ib'%(nBitsAddr+2))[2:]
         STC_Data += idxBits
 
     for i in range(nSTC):
-        dataBits = format(SumData[i], '#0%ib'%(11))[2:]
+        dataBits = format(SumData[i], '#0%ib'%(nBitsData+2))[2:]
         STC_Data += dataBits
         
     formattedData = header + STC_Data
@@ -366,7 +369,8 @@ def formatCTC_4_7(row, nSTC, debug=False):
 
     SumData = row[colsSUM].values
 
-    nBitsAddr = 4 
+    nBitsAddr = 0
+    nBitsData = 7 
 
     #only a 4 bit header for STC
     bx_cnt = row['BX_CNT']
@@ -375,7 +379,7 @@ def formatCTC_4_7(row, nSTC, debug=False):
     
     STC_Data = ""
     for i in range(nSTC):
-        dataBits = format(SumData[i], '#0%ib'%(11))[2:]
+        dataBits = format(SumData[i], '#0%ib'%(nBitsData+2))[2:]
         STC_Data += dataBits
         
     formattedData = header + STC_Data
@@ -397,19 +401,29 @@ def Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_
     if STC_TYPE==0: #STC4_9
         nSTC = 12 if EPORTTX_NUMEN>=5 else 11 if EPORTTX_NUMEN==4 else 8 if EPORTTX_NUMEN==3 else 5 if EPORTTX_NUMEN==2 else 2 
         df_Format = pd.DataFrame(df_in.apply(formatSTC_4_9, nSTC=nSTC, axis=1).values,columns=['FullDataString'],index=df_in.index)
+        if EPORTTX_NUMEN>5:
+            df_Format['FullDataString'] = ''
     elif STC_TYPE==1: #STC16_9
         nSTC = 3 if EPORTTX_NUMEN>=2 else 2
         df_Format = pd.DataFrame(df_in.apply(formatSTC_16_9, nSTC=nSTC, axis=1).values,columns=['FullDataString'],index=df_in.index)
+        if EPORTTX_NUMEN>2:
+            df_Format['FullDataString'] = ''
     elif STC_TYPE==2: #CTC4_7
         nSTC = 12 if EPORTTX_NUMEN>=3 else 8 if EPORTTX_NUMEN==2 else 4
-        df_Format = pd.DataFrame(df_in.apply(formatSTC_4_7, nSTC=nSTC, axis=1).values,columns=['FullDataString'],index=df_in.index)
-    elif STC_TYPE==3: #STC4_7
-        nSTC = 3 if EPORTTX_NUMEN>=2 else 2
         df_Format = pd.DataFrame(df_in.apply(formatCTC_4_7, nSTC=nSTC, axis=1).values,columns=['FullDataString'],index=df_in.index)
+        if EPORTTX_NUMEN>3:
+            df_Format['FullDataString'] = ''
+    elif STC_TYPE==3: #STC4_7
+        nSTC = 12 if EPORTTX_NUMEN>=4 else 10 if EPORTTX_NUMEN==3 else 6 if EPORTTX_NUMEN==2 else 3
+        df_Format = pd.DataFrame(df_in.apply(formatSTC_4_7, nSTC=nSTC, axis=1).values,columns=['FullDataString'],index=df_in.index)
+        if EPORTTX_NUMEN>4:
+            df_Format['FullDataString'] = ''
         
     df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
+
+    df_Format.loc[df_Format.FRAMEQ_NUMW==0,'FRAMEQ_NUMW']=2
         
-    df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+    df_Format['IdleWord'] = 0 #(df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
 
     frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
@@ -432,8 +446,13 @@ def formatRepeaterOutput(row,debug=False):
     header =  format(bx_cnt, '#0%ib'%(7))[2:]
 
     formattedData = header + ChargeData
-    nPadBits = 16 - (len(formattedData)%16)
-    paddedData = formattedData + '0'*nPadBits
+
+    if len(formattedData)%16==0:
+        nPadBits=0
+        paddedData = formattedData
+    else:
+        nPadBits = 16 - (len(formattedData)%16)
+        paddedData = formattedData + '0'*nPadBits
 
     return paddedData
 
@@ -444,7 +463,53 @@ def Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord):
 
     df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
 
-    df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+    df_Format['IdleWord'] = 0 #(df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+
+    frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
+
+    df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
+
+    df_Format['FRAMEQ_Truncated_0'] = 0
+    df_Format['FRAMEQ_Truncated_1'] = 0
+
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
+
+
+
+def binFormat(x,N):
+    return format(x,f'#0{N+2}b')[2:]
+
+binFormat=np.vectorize(binFormat)
+
+def format_AutoencoderOutput(row, Eporttx_Numen):
+    ae_Bits = np.array(list(''.join(row[[f'AE_BYTE{i}' for i in range(19,-1,-1)]].apply(binFormat,N=8))))[7:]
+    ae_Mask = np.array(list(''.join(row[[f'MAE_BYTE{i}' for i in range(17,-1,-1)]].apply(binFormat,N=8))))=='1'
+
+    modSum = ''.join(ae_Bits[-9:])
+    ae_DataBits = ae_Bits[:-9]
+
+    nBits = 16 + 32*(Eporttx_Numen-1)
+
+    AE_Data = ''.join(ae_DataBits[ae_Mask])[-1*nBits:]
+
+    if len(AE_Data) < nBits:
+        AE_Data = '0'*(nBits-len(AE_Data)) + AE_Data
+
+    bx_cnt = row['BX_CNT']
+    header =  format(bx_cnt, '#0%ib'%(7))[2:]
+
+    formattedData = header + modSum +'00' + AE_Data
+
+    return formattedData
+
+def Format_Autoencoder(df_Encoder, df_BX_CNT, Eporttx_Numen, TxSyncWord):
+    df_in = pd.merge(df_Encoder, df_BX_CNT, left_index=True, right_index=True)
+
+    df_Format = pd.DataFrame(df_in.apply(format_AutoencoderOutput, Eporttx_Numen=Eporttx_Numen, axis=1).values,columns=['FullDataString'],index=df_in.index)
+
+    df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
+
+    df_Format['IdleWord'] = 0 #(df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
 
     frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 

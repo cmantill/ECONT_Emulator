@@ -5,3 +5,5 @@ Test*
 Inputs*
 __pycache__
 condor
+verificationData*
+test*

@@ -271,7 +271,7 @@ def formatSTC_4_9(row, nSTC, debug=False):
     
     STC_Data = ""
     for i in range(nSTC):
-        idxBits = format(IdxData[i], '#0%ib'%(nBitsAdd+2))[2:]
+        idxBits = format(IdxData[i], '#0%ib'%(nBitsAddr+2))[2:]
         STC_Data += idxBits
 
     for i in range(nSTC):

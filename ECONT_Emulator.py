@@ -110,7 +110,6 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
 
 
     df_Threshold_Sum, df_BestChoice, df_SuperTriggerCell, df_Repeater = Algorithms(df_CALQ, THRESHV_Registers, DropLSB)
-    del df_CALQ
 
 
     df_Threshold_Sum.to_csv(f'{outputDir}/Threshold_Sum.csv',index=saveIndex)
@@ -121,8 +120,9 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     try:
         df_linkReset = pd.read_csv(f'{inputDir}/LinkResetEconT.csv')
     except:
-        df_linkReset = pd.DataFrame({'LINKRESETECONT':[0]*N},index=df_CALQ.index)
+        df_linkReset = pd.DataFrame({'LINKRESETECONT':0},index=df_CALQ.index)
 
+    del df_CALQ
 
     print('Formatter/Buffer Threshold-Sum')
     df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum)

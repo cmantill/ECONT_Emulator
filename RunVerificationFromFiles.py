@@ -25,9 +25,9 @@ def getRegister(inputFile):
         exit()
     return value[0]
 
-def runVerification(inputDir, outputDir, ASICBlock):
+def runVerification(inputDir, outputDir, ASICBlock, verbose=False):
     if ASICBlock=='Algorithm':
-        print()
+
         AlgoType=getRegister(f'{inputDir}/Algorithm_Input_Type.csv')
 
         df_CALQ = pd.read_csv(f'{inputDir}/Algorithm_Input_CalQ.csv',skipinitialspace=True)
@@ -52,7 +52,7 @@ def runVerification(inputDir, outputDir, ASICBlock):
         df_BX_CNT.columns = ['BX_CNT']
 
         algo = getRegister(f'{inputDir}/Formatter_Buffer_Input_Algorithm_Type.csv')
-        Use_Sum = getRegister(f'{inputDir}/Formatter_Buffer_Input_Use_Sum.csv')
+#        Use_Sum = getRegister(f'{inputDir}/Formatter_Buffer_Input_Use_Sum.csv')
         EPortTx_NumEn = getRegister(f'{inputDir}/Formatter_Buffer_Input_EPortTx_NumEn.csv')
         STC_Type = getRegister(f'{inputDir}/Formatter_Buffer_Input_STC_Type.csv')
         TxSyncWord = getRegister(f'{inputDir}/Formatter_Buffer_Input_TxSyncWord.csv')
@@ -66,6 +66,10 @@ def runVerification(inputDir, outputDir, ASICBlock):
             df_Sum = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_Sum.csv',skipinitialspace=True)
             df_SumNotTransmitted = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_SumNotTransmitted.csv',skipinitialspace=True)
             df_SumNotTransmitted.columns=['SUM_NOT_TRANSMITTED']
+
+            Use_Sum = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_Use_Sum.csv',skipinitialspace=True)
+            Use_Sum.columns=['USE_SUM']
+            
             df_Threshold_Sum = df_AddrMap.merge(df_ChargeQ, left_index=True, right_index=True).merge(df_Sum, left_index=True, right_index=True).merge(df_SumNotTransmitted, left_index=True, right_index=True)
 
             df_Emulator = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum).drop('IdleWord',axis=1)
@@ -88,6 +92,9 @@ def runVerification(inputDir, outputDir, ASICBlock):
             df_BC_Charge = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_BC_Charge.csv',skipinitialspace=True)
             df_BC_TC_map = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_BC_TC_map.csv',skipinitialspace=True)
             df_BestChoice = df_BC_Charge.merge(df_BC_TC_map, left_index=True, right_index=True)
+
+            Use_Sum = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_Use_Sum.csv',skipinitialspace=True)
+            Use_Sum.columns=['USE_SUM']
 
             df_Emulator = Format_BestChoice(df_BestChoice,EPortTx_NumEn, df_BX_CNT, TxSyncWord, Use_Sum).drop('IdleWord',axis=1)
 
@@ -164,7 +171,8 @@ def runVerification(inputDir, outputDir, ASICBlock):
         mine = df_Emulator[c].values
         cristians = df_Comparison[c].values
         compare= mine==cristians
-        print (c, "Agree" if compare.all() else "DISAGREE")
+        if verbose:
+            print (c, "Agree" if compare.all() else "DISAGREE")
 
         if compare.all():
             matching.append(c)
@@ -172,24 +180,30 @@ def runVerification(inputDir, outputDir, ASICBlock):
             mismatch.append(c)
             # print(df_Emulator[c][~compare])
             # print(df_Comparison[c][~compare])
-    if len(mismatch)>0:
-        print()
-        print()
-        print("DISAGREEMENT COLUMNS")
-        print("Emulator:")
-        print(df_Emulator[mismatch].head())
-        print()
-        print("Verilog:")
-        print(df_Comparison[mismatch].head())
+    if verbose:
+        if len(mismatch)>0:
+            print()
+            print()
+            print("DISAGREEMENT COLUMNS")
+            print("Emulator:")
+            print(df_Emulator[mismatch].head())
+            print()
+            print("Verilog:")
+            print(df_Comparison[mismatch].head())
+        else:
+            print()
+            print("GOOD AGREEMENT")
+            print()
 
-    if 'Buffer' in ASICBlock:
-        print()
-        print('Buffer Control Summary Counts')
-        x = df_Emulator[[f'Cond{i}' for i in range(1,5)]]
-        x.columns = ['T1 Truncations','T2 Truncations', 'T3 Full Data','Full Data']
-        print(x.sum().to_string())
-        print()
-    return df_Emulator, df_Comparison
+        if 'Buffer' in ASICBlock:
+            print()
+            print('Buffer Control Summary Counts')
+            x = df_Emulator[[f'Cond{i}' for i in range(1,5)]]
+            x.columns = ['T1 Truncations','T2 Truncations', 'T3 Full Data','Full Data']
+            print(x.sum().to_string())
+            print()
+
+    return len(mismatch)==0, df_Emulator, df_Comparison
 
 
 if __name__=='__main__':
@@ -197,7 +211,8 @@ if __name__=='__main__':
     parser.add_argument('-i','--input', dest='inputDir', help='input directory name')
     parser.add_argument('-o','--output', dest='outputDir', default=None, help='outputDirectory, if different than directory of input file')
     parser.add_argument('-b','--block', dest="ASICBlock", default=None, help='ASIC block to run on')
+#    parser.add_argument('-v','--verbose', dest="Verbose", default=False, action='store_true', help='verbose outputs')
 
     args = parser.parse_args()
     
-    df_Mine, df_Cristian= runVerification(**vars(args))
+    passVerification, df_Mine, df_Cristian= runVerification(**vars(args), verbose=True)

@@ -456,12 +456,12 @@ def formatRepeaterOutput(row,debug=False):
 
     return paddedData
 
-def Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord):
+def Format_Repeater(df_Repeater, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord):
     df_in = pd.merge(df_Repeater, df_BX_CNT, left_index=True, right_index=True)
 
     df_Format = pd.DataFrame(df_in.apply(formatRepeaterOutput, axis=1).values,columns=['FullDataString'],index=df_in.index)
 
-    df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
+    df_Format['FRAMEQ_NUMW'] = min(25, 2*EPORTTX_NUMEN)
 
     df_Format['IdleWord'] = 0 #(df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
 

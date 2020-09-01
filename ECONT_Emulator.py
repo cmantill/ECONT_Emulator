@@ -101,7 +101,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     pd.DataFrame([[Use_Sum]], columns=['USE_SUM'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=saveIndex)
 
     BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*12*2
-    BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*12*2-25
+    BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*12*2-24
     BUFFER_THRESHOLD_T3 = 25
 
     pd.DataFrame([[int(BUFFER_THRESHOLD_T1)]], columns=['BUFFER_THRESHOLD_T1'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T1.csv', index=saveIndex)
@@ -152,7 +152,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     del df_BufferOutput_STC
 
     print('Formatter/Buffer Repeater')
-    df_Format_RPT = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord)    
+    df_Format_RPT = Format_Repeater(df_Repeater, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord)    
     df_BufferOutput_RPT = Buffer(df_Format_RPT, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Repeater
     df_Format_RPT.to_csv(f'{outputDir}/Format_RPT.csv',index=saveIndex)

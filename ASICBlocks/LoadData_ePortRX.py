@@ -31,7 +31,7 @@ def loadEportRXData(_inputDir):
 
     ePortHeader = df['ePortRxDataGroup_0'].values>>28
     if (ePortHeader==0).all() :
-        headers = df['BX'].values%16
+        headers = df['BX'].values%32
         headers[df['BX'].values==0] = 31
     else:
         try:

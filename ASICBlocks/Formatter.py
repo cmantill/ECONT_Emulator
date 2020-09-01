@@ -188,7 +188,7 @@ def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
 
     bx_cnt = row['BX_CNT']
     header =  format(bx_cnt, '#0%ib'%(7))[2:]
-    header = header[0] + header[2:]
+    header = header[1:]
 
     if Use_Sum:
         modSumData = format(SUM, '#010b')[2:]
@@ -216,7 +216,7 @@ def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
         for x in CHARGEQ:
             ChargeData += encode(x,nDropBit,nExp,nMant,roundBits)
 
-    formattedData = header + modSumData + nChannelData + AddressMapData + ChargeData
+    formattedData = header + modSumData + AddressMapData + ChargeData
 
     if len(formattedData)%16==0:
         nPadBits=0

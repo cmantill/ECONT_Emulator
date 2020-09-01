@@ -53,4 +53,4 @@ linksPerLayer = {1  : 2,
                  52 : 2}
 
 ###https://github.com/PFCal-dev/cmssw/blob/hgc-tpg-devel-CMSSW_11_0_0_pre2/L1Trigger/L1THGCal/python/hgcalConcentratorProducer_cfi.py#L33-L42
-tcPerLink = [0, 1, 3, 6, 9, 14, 18, 23, 27, 32, 37, 41, 46]
+tcPerLink = [0, 1, 4, 6, 9, 14, 18, 23, 28, 32, 37, 41, 46, 48]

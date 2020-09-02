@@ -514,7 +514,7 @@ binFormat=np.vectorize(binFormat)
 
 def format_AutoencoderOutput(row, Eporttx_Numen):
     ae_Bits = np.array(list(''.join(row[[f'AE_BYTE{i}' for i in range(19,-1,-1)]].apply(binFormat,N=8))))[7:]
-    ae_Mask = np.array(list(''.join(row[[f'MAE_BYTE{i}' for i in range(17,-1,-1)]].apply(binFormat,N=8))))=='1'
+    ae_Mask = np.array(list(''.join(row[[f'KAEB_BYTE{i}' for i in range(17,-1,-1)]].apply(binFormat,N=8))))=='1'
 
     modSum = ''.join(ae_Bits[-9:])
     ae_DataBits = ae_Bits[:-9]

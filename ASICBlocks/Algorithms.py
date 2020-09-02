@@ -54,6 +54,8 @@ from .bestchoice import sort, batcher_sort
 def BestChoice(df_CALQ, DropLSB):
     df_in = pd.DataFrame(df_CALQ.values>>DropLSB.values,columns=df_CALQ.columns, index=df_CALQ.index)
 
+    df_in[df_in>262143]=262143
+
     df_sorted, _ = sort(df_in)
     df_sorted_index = pd.DataFrame(df_in.apply(batcher_sort, axis=1))
 

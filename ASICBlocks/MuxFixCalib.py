@@ -6,7 +6,16 @@ decodeV = np.vectorize(decode)
 
 import pickle
 
-def getMuxRegisters(tpgNtupleMapping=False):
+def getMuxRegisters(tpgNtupleMapping=False, MuxRegisters=None):
+    if not MuxRegisters is None:
+        if '.csv' in MuxRegisters:
+            mux = pd.read_csv(MuxRegisters)
+            return mux.values[0]
+        if type(MuxRegisters) is np.ndarray:
+            return MuxRegisters
+        if type(MuxRegisters) is list:
+            return np.array(MuxRegisters)
+
     tc_remap = pd.read_csv("Utils/LDM_TC_Mapping.csv")[['TC_Number','ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']]
     
     muxRegisters = tc_remap[['ECON_TC_Number_PostMux','ECON_TC_Number_PreMux']].values
@@ -33,7 +42,7 @@ def FloatToFix(df_Mux_out, isHDM):
     df_F2F = pd.DataFrame(decodeV(df_Mux_out,3 if isHDM else 1),columns=[f'F2F_{i}' for i in range(48)],index=df_Mux_out.index)
     return df_F2F
 
-def getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion, tpgNtupleMapping=False):
+def getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion, tpgNtupleMapping=False, CalRegisters=None, ThresholdRegisters=None):
     
     if geomVersion in ['v10','v11']:
         with open('Utils/geomDF_v10.pkl','rb') as geomFile:
@@ -63,6 +72,25 @@ def getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion, tpgNtu
     for x in muxRegisters:
         remappedCalibVal[x[1]] = calibVal[x[0]]
         remappedThreshVal[x[1]] = threshVal[x[0]]
+
+    if not CalRegisters is None:
+        if '.csv' in CalRegisters:
+            calV = pd.read_csv(CalRegisters)
+            remappedCalibVal = calV.values[0]
+        if type(CalRegisters) is np.ndarray:
+            remappedCalibVal = CalRegisters
+        if type(CalRegisters) is list:
+            remappedCalibVal = np.array(CalRegisters)
+
+    if not ThresholdRegisters is None:
+        if '.csv' in ThresholdRegisters:
+            calV = pd.read_csv(ThresholdRegisters)
+            remappedThreshVal = calV.values[0]
+        if type(ThresholdRegisters) is np.ndarray:
+            remappedThreshVal = ThresholdRegisters
+        if type(ThresholdRegisters) is list:
+            remappedThreshVal = np.array(ThresholdRegisters)
+
     return remappedCalibVal, remappedThreshVal
     
 def Calibrate(df_F2F, CALVALUE_Registers):

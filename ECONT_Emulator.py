@@ -21,7 +21,7 @@ from ASICBlocks.Formatter import Format_Threshold_Sum, Format_BestChoice, Format
 from ASICBlocks.BufferBlock import Buffer
 
 
-def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False):
+def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False, MuxRegisters=None, CalRegisters=None, ThresholdRegisters=None):
     if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
     df_ePortRxDataGroup, df_BX_CNT, df_SimEnergyStatus = loadEportRXData(inputDir,SimEnergyFlag)
@@ -34,11 +34,11 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     print('MuxFixCalib')
     columns = [f'ePortRxDataGroup_{i}' for i in range(12)]
     df_Mux_in = splitEportRXData(df_ePortRxDataGroup[columns])
-    Mux_Select = getMuxRegisters(AEMuxOrdering)
+    Mux_Select = getMuxRegisters(AEMuxOrdering, MuxRegisters)
     df_Mux_out = Mux(df_Mux_in, Mux_Select)
 
     df_F2F = FloatToFix(df_Mux_out, isHDM)
-    CALVALUE_Registers, THRESHV_Registers = getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion)
+    CALVALUE_Registers, THRESHV_Registers = getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion, tpgNtupleMapping=AEMuxOrdering, CalRegisters=CalRegisters, ThresholdRegisters=ThresholdRegisters)
     df_CALQ = Calibrate(df_F2F, CALVALUE_Registers)
 
     if SimEnergyFlag:

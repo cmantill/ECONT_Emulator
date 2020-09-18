@@ -216,6 +216,12 @@ def formatBestChoiceOutput(row, nTC = 1, debug=False):
         
 #        bitmap = np.array([int(x) for x in format(ADD_MAP, '#0%ib'%(48+2))[2:]][::-1])
         channelNumbers = np.arange(48)[BITMAP==1]
+
+        #append address 0 for the cases where less than nTC channels are present in the bitmap.  This can happen when a channel index shows up twice in BC_TC_MAP
+        if len(channelNumbers) < nTC:
+            channelNumbers = channelNumbers.tolist() + [0]*(nTC - len(channelNumbers))
+
+
         channelNumbersBin = [format(x,'#0%ib'%(6+2))[2:] for x in channelNumbers]
 
         AddressMapData = ''
@@ -232,7 +238,8 @@ def formatBestChoiceOutput(row, nTC = 1, debug=False):
         for x in CHARGEQ:
             ChargeData += encode(x,nDropBit,nExp,nMant,roundBits)
 
-    formattedData = header + modSumData + nChannelData + AddressMapData + ChargeData
+#    formattedData = header + modSumData + nChannelData + AddressMapData + ChargeData
+    formattedData = header + modSumData + AddressMapData + ChargeData
 
     if len(formattedData)%16==0:
         nPadBits=0
@@ -265,7 +272,8 @@ def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_S
 
     df_Format = pd.DataFrame(df_in.apply(formatBestChoiceOutput, nTC=tcPerLink[EPORTTX_NUMEN], axis=1).values,columns=['FullDataString'],index=df_in.index)
 
-    df_Format['FRAMEQ_NUMW'] = 2*EPORTTX_NUMEN #(df_Format['FullDataString'] .str.len()/16).astype(int)
+    df_Format['FRAMEQ_NUMW'] = 2*EPORTTX_NUMEN if EPORTTX_NUMEN<13 else 25
+#    df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
 
     df_Format['IdleWord'] = 0
     # if type(TxSyncWord) is pd.DataFrame:

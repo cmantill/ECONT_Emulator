@@ -247,11 +247,11 @@ def FormatBuffer(inputDir, outputDir):
 
 
     #create dummy files for the auto encoder
-    dfAE = pd.DataFrame(dict({f'AE_BYTE{i}':0 for i in range(20)},**{f'MAE_BYTE{i}':0 for i in range(18)}), index=df.index)
+    dfAE = pd.DataFrame(dict({f'AE_BYTE{i}':0 for i in range(20)},**{f'KAEB_BYTE{i}':0 for i in range(18)}), index=df.index)
     dfAE[[f'AE_BYTE{i}' for i in range(20)]].to_csv(f'{outputDir}/Formatter_Buffer_Input_outEncoder.csv',index=saveIndex)
     NewFiles.append('Formatter_Buffer_Input_outEncoder.csv')
-    dfAE[[f'MAE_BYTE{i}' for i in range(18)]].to_csv(f'{outputDir}/Formatter_Buffer_Input_mask_auto_encoder.csv',index=saveIndex)
-    NewFiles.append('Formatter_Buffer_Input_mask_auto_encoder.csv')
+    dfAE[[f'KAEB_BYTE{i}' for i in range(18)]].to_csv(f'{outputDir}/Formatter_Buffer_Input_keep_auto_encoder_bits.csv',index=saveIndex)
+    NewFiles.append('Formatter_Buffer_Input_keep_auto_encoder_bits.csv')
 
 
     #update file contents to leave space after comma in csv

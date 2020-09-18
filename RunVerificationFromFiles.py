@@ -25,10 +25,11 @@ def getRegister(inputFile):
         exit()
     return value[0]
 
-def runVerification(inputDir, outputDir, ASICBlock, verbose=False):
+def runVerification(inputDir, outputDir, ASICBlock, verbose=False, algo=None):
     if ASICBlock=='Algorithm':
 
-        AlgoType=getRegister(f'{inputDir}/Algorithm_Input_Type.csv')
+        if algo is None:
+            algo=getRegister(f'{inputDir}/Algorithm_Input_Type.csv')
 
         df_CALQ = pd.read_csv(f'{inputDir}/Algorithm_Input_CalQ.csv',skipinitialspace=True)
         df_DropLSB = pd.read_csv(f'{inputDir}/Algorithm_Input_DropLSB.csv',skipinitialspace=True)
@@ -36,23 +37,59 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False):
         df_Header = pd.read_csv(f'{inputDir}/Algorithm_Input_Header.csv',skipinitialspace=True)
         df_Threshold = pd.read_csv(f'{inputDir}/Algorithm_Input_Threshold.csv',skipinitialspace=True)
 
-        if AlgoType==0:
+        if algo==0: #threshold sum
             latency=1
             df_Emulator=ThresholdSum(df_CALQ, df_Threshold, df_DropLSB)
-
 
             df_AddrMap = pd.read_csv(f'{inputDir}/Algorithm_Output_AddrMap.csv',skipinitialspace=True)
             df_ChargeQ = pd.read_csv(f'{inputDir}/Algorithm_Output_ChargeQ.csv',skipinitialspace=True)
             df_Sum = pd.read_csv(f'{inputDir}/Algorithm_Output_Sum.csv',skipinitialspace=True)
             df_SumNotTransmitted = pd.read_csv(f'{inputDir}/Algorithm_Output_SumNotTransmitted.csv',skipinitialspace=True)
             df_Comparison = df_AddrMap.merge(df_ChargeQ, left_index=True, right_index=True).merge(df_Sum, left_index=True, right_index=True).merge(df_SumNotTransmitted, left_index=True, right_index=True)
+
+        elif algo==1: #STC
+            latency = 1
+            df_Emulator = SuperTriggerCell(df_CALQ, df_DropLSB)
+
+            df_XTC4_9 = pd.read_csv(f'{inputDir}/Algorithm_Output_XTC4_9_Sum.csv',skipinitialspace=True)
+            df_XTC16_9 = pd.read_csv(f'{inputDir}/Algorithm_Output_XTC16_9_Sum.csv',skipinitialspace=True)
+            df_XTC4_7 = pd.read_csv(f'{inputDir}/Algorithm_Output_XTC4_7_Sum.csv',skipinitialspace=True)
+            df_MAX4_Addr = pd.read_csv(f'{inputDir}/Algorithm_Output_MAX4_Addr.csv',skipinitialspace=True)
+            df_MAX16_Addr= pd.read_csv(f'{inputDir}/Algorithm_Output_MAX16_Addr.csv',skipinitialspace=True)
+
+            df_Comparison = df_XTC4_9.merge(df_XTC16_9,left_index=True, right_index=True).merge(df_XTC4_7,left_index=True, right_index=True).merge(df_MAX4_Addr,left_index=True, right_index=True).merge(df_MAX16_Addr,left_index=True, right_index=True)
+
+
+        elif algo==2: #BC
+            latency = 2
+            df_Emulator = BestChoice(df_CALQ, df_DropLSB)
+
+            df_BC_Charge = pd.read_csv(f'{inputDir}/Algorithm_Output_BC_Charge.csv',skipinitialspace=True)
+            df_BC_TC_map = pd.read_csv(f'{inputDir}/Algorithm_Output_BC_TC_map.csv',skipinitialspace=True)
+
+            df_Comparison = df_BC_Charge.merge(df_BC_TC_map,left_index=True, right_index=True)
+
+        elif algo==3: #RPT
+            latency = 1
+            df_Emulator = Repeater(df_CALQ, df_DropLSB)
+
+            df_Comparison = pd.read_csv(f'{inputDir}/Algorithm_Output_RepeaterQ.csv',skipinitialspace=True)
+
+        elif algo==4: #AE
+            latency=1
+            print('AE not yet implemented')
+            exit()
+        else:
+            print('unknown algorithm type')
+            exit()
+            
+
             
     elif ASICBlock=='Formatter':
         df_BX_CNT = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_Bx_Cnt_In.csv',skipinitialspace=True)
         df_BX_CNT.columns = ['BX_CNT']
 
         algo = getRegister(f'{inputDir}/Formatter_Buffer_Input_Algorithm_Type.csv')
-#        Use_Sum = getRegister(f'{inputDir}/Formatter_Buffer_Input_Use_Sum.csv')
         EPortTx_NumEn = getRegister(f'{inputDir}/Formatter_Buffer_Input_EPortTx_NumEn.csv')
         STC_Type = getRegister(f'{inputDir}/Formatter_Buffer_Input_STC_Type.csv')
         TxSyncWord = getRegister(f'{inputDir}/Formatter_Buffer_Input_TxSyncWord.csv')
@@ -109,7 +146,7 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False):
             latency=1
             
             df_AEBytes = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_outEncoder.csv',skipinitialspace=True)
-            df_AEMask = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_mask_auto_encoder.csv',skipinitialspace=True)
+            df_AEMask = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_keep_auto_encoder_bits.csv',skipinitialspace=True)
 
             df_Autoencoder = df_AEBytes.merge(df_AEMask, left_index=True, right_index=True)
 
@@ -160,7 +197,7 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False):
     for i in range(latency):
         df_Emulator.drop(len(df_Emulator)-1,inplace=True)
             
-        df_Comparison.drop(0,inplace=True)
+        df_Comparison.drop(i,inplace=True)
 
     df_Comparison.reset_index(inplace=True,drop=True)
             
@@ -178,8 +215,6 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False):
             matching.append(c)
         else:
             mismatch.append(c)
-            # print(df_Emulator[c][~compare])
-            # print(df_Comparison[c][~compare])
     if verbose:
         if len(mismatch)>0:
             print()
@@ -205,12 +240,35 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False):
 
     return len(mismatch)==0, df_Emulator, df_Comparison
 
+from Utils.linkAllocation import tcPerLink
+
+#debuging function
+def splitBCFormat(row, NTX=1):
+    columns = [f'FRAMEQ_{i}' for i in range(2*NTX)]
+    values = list(row[columns].values)
+
+    bitString = ''.join(binV(values))
+
+    nTC = tcPerLink[NTX]
+    output = bitString[0:4] + '  ' + bitString[4:12]
+    startIDX = 12
+    for i in range(nTC):
+        output += '  ' + bitString[startIDX:startIDX+6]
+        startIDX += 6
+    for i in range(nTC):
+        output += '  ' + bitString[startIDX:startIDX+7]
+        startIDX += 7
+
+    return output
+
+
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i','--input', dest='inputDir', help='input directory name')
     parser.add_argument('-o','--output', dest='outputDir', default=None, help='outputDirectory, if different than directory of input file')
     parser.add_argument('-b','--block', dest="ASICBlock", default=None, help='ASIC block to run on')
+    parser.add_argument('-a','--algo', dest="algo", default=None, type=int, help='Algorithm to use (if None, use value in csv files)')
 #    parser.add_argument('-v','--verbose', dest="Verbose", default=False, action='store_true', help='verbose outputs')
 
     args = parser.parse_args()

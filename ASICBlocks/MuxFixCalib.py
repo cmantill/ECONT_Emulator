@@ -42,6 +42,13 @@ def getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion, tpgNtu
         with open('Utils/geomDF_v9.pkl','rb') as geomFile:
             geomDF = pickle.load(geomFile).loc[subdet,layer,wafer]
 
+    if len(geomDF)<48:
+        newGeomDF = pd.DataFrame({'corrFactor_finite':[0]*48,'threshold_ADC':[0]*48,'triggercell':np.arange(48)})
+        newGeomDF.set_index('triggercell',inplace=True)
+        newGeomDF['corrFactor_finite'] = geomDF['corrFactor_finite']
+        newGeomDF['threshold_ADC'] = geomDF['threshold_ADC']
+        geomDF = newGeomDF.fillna(0)
+
     calibVal, threshVal =  np.round((geomDF.corrFactor_finite*2**11).values).astype(int), geomDF.threshold_ADC.values
 
     if tpgNtupleMapping:

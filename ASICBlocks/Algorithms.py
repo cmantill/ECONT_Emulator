@@ -70,7 +70,7 @@ def BestChoice(df_CALQ, DropLSB):
     
 from .supertriggercell import supertriggercell_2x2, supertriggercell_4x4
 
-def SuperTriggerCell(df_CALQ):
+def SuperTriggerCell(df_CALQ, DropLSB):
 
     stcData_2x2 = df_CALQ.apply(supertriggercell_2x2,axis=1)
     stcData_4x4 = df_CALQ.apply(supertriggercell_4x4,axis=1)
@@ -87,7 +87,7 @@ def SuperTriggerCell(df_CALQ):
     df_SuperTriggerCell[cols_XTC16_9 + cols_MAX16_ADDR] = pd.DataFrame(stcData_4x4.tolist(),columns = cols_XTC16_9+cols_MAX16_ADDR, index = df_CALQ.index)
 
     for i,c in enumerate(cols_XTC4_9):
-        df_SuperTriggerCell[cols_XTC4_7[i]] = encodeV(df_SuperTriggerCell[c],0,4,3,asInt=True)
+        df_SuperTriggerCell[cols_XTC4_7[i]] = encodeV(df_SuperTriggerCell[c].values>>DropLSB.values.flatten(),0,4,3,asInt=True)
         df_SuperTriggerCell[c] = encodeV(df_SuperTriggerCell[c],0,5,4,asInt=True)
 
     for c in cols_XTC16_9:
@@ -125,7 +125,7 @@ def Algorithms(df_CALQ, THRESHV_Registers, DropLSB):
     
     df_BestChoice = BestChoice(df_CALQ, DropLSB)
     
-    df_SuperTriggerCell = SuperTriggerCell(df_CALQ)
+    df_SuperTriggerCell = SuperTriggerCell(df_CALQ, DropLSB)
     
     df_Repeater = Repeater(df_CALQ, DropLSB)
     

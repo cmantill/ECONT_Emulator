@@ -49,7 +49,26 @@ def parseConfig(configName):
                 print(f'Unknown command {values[2]}, skipping')
     return offsetChanges, fastCommands
 
-def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1, ORBSYN_CNT_LOAD_VAL=0, makeOffsetChange=False):
+
+fullFastCommandList = ["FASTCMD_NOT_IDLE", "FASTCMD_PREL1A", "FASTCMD_L1A", "FASTCMD_L1A_PREL1A", "FASTCMD_L1A_NZS", "FASTCMD_L1A_NZS_PREL1A", "FASTCMD_L1A_BCR", "FASTCMD_L1A_BCR_PREL1A", "FASTCMD_L1A_CALPULSEINT", "FASTCMD_L1A_CALPULSEEXT", "FASTCMD_L1A_CALPULSEINT_PREL1A", "FASTCMD_L1A_CALPULSEEXT_PREL1A", "FASTCMD_BCR", "FASTCMD_BCR_PREL1A", "FASTCMD_BCR_OCR", "FASTCMD_CALPULSEINT", "FASTCMD_CALPULSEEXT", "FASTCMD_CALPULSEINT_PREL1A", "FASTCMD_CALPULSEEXT_PREL1A", "FASTCMD_CHIPSYNC", "FASTCMD_EBR", "FASTCMD_ECR", "FASTCMD_LINKRESETROCT", "FASTCMD_LINKRESETROCD", "FASTCMD_LINKRESETECONT", "FASTCMD_LINKRESETECOND", "FASTCMD_SPARE_0", "FASTCMD_SPARE_1", "FASTCMD_SPARE_2", "FASTCMD_SPARE_3", "FASTCMD_SPARE_4", "FASTCMD_SPARE_5", "FASTCMD_SPARE_6", "FASTCMD_SPARE_7"]
+
+def produceRandomFastCommandsAndOffsets(fastCommandPercent, N):
+    commandsBX = np.random.choice(np.arange(N), np.random.poisson(N*fastCommandPercent/100.), replace=False)
+    fastCommandBX = np.random.choice(commandsBX, min(np.random.poisson(len(commandsBX)*.5),len(commandsBX)), replace=False)
+    offsetBX = list(set(commandsBX) - set(fastCommandBX))
+
+    offsetChanges = []
+    fastCommands = []
+
+    for bx in offsetBX:
+        offsetChanges.append([int(bx/3564), bx%3564, np.random.choice(range(12)),int(np.random.normal(128,30))])
+    for bx in fastCommandBX:
+        fastCommands.append([np.random.choice(fullFastCommandList), int(bx/3564), bx%3564])
+
+    return offsetChanges, fastCommands
+
+
+def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommands=-1, N=-1, ORBSYN_CNT_LOAD_VAL=0, makeOffsetChange=False, randomSampling=False):
 
     inputFile=f'{inputDir}/EPORTRX_data.csv'
     outputFile=f'{outputDir}/EPORTRX_data.csv'
@@ -57,17 +76,37 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1, ORBSYN_CNT_
     # inputFile = f'{inputDir}/MuxFixCalib_Input_ePortRX.csv'
     # outputFile = f'{outputDir}/ECON_T_ePortRX.txt'
 
-    eportRXData = pd.read_csv(inputFile,skipinitialspace=True)
+    try:
+        eportRXData = pd.read_csv(inputFile,skipinitialspace=True)
+    except:
+        print (f'Problem loading {inputFile}, trying EPortRX_Input_EPORTRX_data.csv')
+        try:
+            inputFile2=f'{inputDir}/EPortRX_Input_EPORTRX_data.csv'
+            eportRXData = pd.read_csv(inputFile2,skipinitialspace=True)
+            if not (eportRXData.FASTCMD=='FASTCMD_IDLE').all():
+                print('Input data set has fast commands issued, cannot re-process a second time')
+                print('Exiting')
+                exit()
+            eportRXData = eportRXData[[f'ePortRxDataGroup_{i}' for i in range(12)]] & 268435455
+
+        except:
+            print('Unable to load eportRX data, exiting')
+            exit()
 
     shutil.copy(f'{inputDir}/metaData.py',f'{outputDir}/metaData.py')
 
     if N==-1:
         N = len(eportRXData)
     elif N > len(eportRXData):
-        print(f'More BX requested than in the input file, using only {len(eportRXData)} BX from input')
-        N = len(eportRXData)
+        if not randomSampling:
+            print(f'More BX requested than in the input file, using only {len(eportRXData)} BX from input')
+            N = len(eportRXData)
 
-    eportRXData = eportRXData[:N]
+    if randomSampling:
+        idxChoice = np.random.choice(eportRXData.index.values, N)
+        eportRXData = eportRXData.loc[idxChoice].reset_index(drop=True)
+    else:
+        eportRXData = eportRXData[:N]
 
     pd.DataFrame({'ORBSYN_CNT_LOAD_VAL':[ORBSYN_CNT_LOAD_VAL]*N}).to_csv(f'{outputDir}/ORBSYN_CNT_LOAD_VAL.csv',index=False)
     
@@ -92,6 +131,10 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1, ORBSYN_CNT_
 
     if not configFile is None:
         offsetChanges, fastCommands = parseConfig(configFile)
+    elif not randomFastCommands == -1:
+        offsetChanges, fastCommands = produceRandomFastCommandsAndOffsets(randomFastCommands, N)
+        print (offsetChanges)
+        print (fastCommands)
 
     offsetChanges.sort()
     fastCommands.sort()
@@ -124,10 +167,9 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1, ORBSYN_CNT_
         _orbit = f[1]
         _bucket = f[2]
         _globalBX = _orbit* 3564 + _bucket
-        if _command.lower() in ['ocr','bcr','chipsync']:
-            globalBXCounter[_globalBX:-1] = (np.arange(len(globalBXCounter[_globalBX:-1])) + ORBSYN_CNT_LOAD_VAL) % 3564
 
-            eportRXData.loc[_globalBX,'FASTCMD'] ="FASTCMD_"+_command.upper()
+        if ('ocr' in _command.lower()) or ('bcr' in _command.lower()) or ('chipsync' in _command.lower()):
+            globalBXCounter[_globalBX:-1] = (np.arange(len(globalBXCounter[_globalBX:-1])) + ORBSYN_CNT_LOAD_VAL) % 3564
 
     # set header, with BX counter after the fast commands
 
@@ -151,23 +193,29 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, N=-1, ORBSYN_CNT_
         _bucket = f[2]
         _globalBX = _orbit* 3564 + _bucket
 
-        if _command.lower()=='linkresetroct':
-            eportRXData.loc[_globalBX,'FASTCMD'] = "FASTCMD_"+_command.upper()
-
+        if 'linkresetroct' in _command.lower():
             _bxSyncEnd = _globalBX + 255
             if _bxSyncEnd>=N:
                 _bxSyncEnd = N-1
 
             eportRXData.loc[_globalBX:_bxSyncEnd,dataCols] = idle_packet
 
-        if _command.lower()=='linkresetecont':
-            eportRXData.loc[_globalBX,'FASTCMD'] = "FASTCMD_"+_command.upper()
-
+        if 'linkresetecont' in  _command.lower():
             _bxSyncEnd = _globalBX + 255
             if _bxSyncEnd>=N:
                 _bxSyncEnd = N-1
 
-            econtLinkReset.loc[_globalBX:_bxSyncEnd,'LINK_RESET_ECONT'] = 1
+            econtLinkReset.loc[_globalBX:_bxSyncEnd,'LINKRESETECONT'] = 1
+
+
+
+    for f in fastCommands:
+        _command = f[0]
+        _orbit = f[1]
+        _bucket = f[2]
+        _globalBX = _orbit* 3564 + _bucket
+
+        eportRXData.loc[_globalBX,'FASTCMD'] = ("FASTCMD_"+_command.upper()) if not 'FASTCMD' in _command else _command
 
     for c in offsetChanges:
         _orbit = c[0]
@@ -224,6 +272,8 @@ if __name__=='__main__':
     parser.add_argument('-o',"--output", default = None ,dest="outputDir", required=True, help="directory name for output verification data")
     parser.add_argument('-c','--config', default = None, dest='configFile', help='configuration file from which to read the changes (default: None)')
     parser.add_argument('-N', type=int, default = -1,dest="N", help="Number of BX to use, -1 is all in input (default: -1)")
+    parser.add_argument('--random', default = False,dest="RandomSampling", action='store_true', help="Use random sampling of input data to increase statistics")
+    parser.add_argument('--randomFast','--randomFastCommands', default = -1, type=float, dest='randomFastCommands', help='issue random fast commands a certain percent of the time (default is -1, which is off)')
     parser.add_argument('-L', type=int, default = -1,dest="NLinks", help="Number of ePortTX links to use, -1 is all in input (default: -1)")
     parser.add_argument('--counterReset', type=int, default = 0,dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 0)")
 
@@ -238,13 +288,15 @@ if __name__=='__main__':
     offsetChanges, fastCommands, N = produceEportRX_input(inputDir = args.inputDir, 
                                                           outputDir = tempOutputDir, 
                                                           configFile = args.configFile,
+                                                          randomFastCommands = args.randomFastCommands,
                                                           N = args.N,
                                                           ORBSYN_CNT_LOAD_VAL=args.ORBSYN_CNT_LOAD_VAL,
-                                                          makeOffsetChange=False)
+                                                          makeOffsetChange=False,
+                                                          randomSampling=args.RandomSampling)
 
     runEmulator(tempOutputDir, ePortTx=args.NLinks)
 
     makeVerificationData(tempOutputDir, args.outputDir)
 
-#    shutil.rmtree(tempOutputDir)
+    shutil.rmtree(tempOutputDir)
     

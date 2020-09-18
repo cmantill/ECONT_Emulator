@@ -24,7 +24,7 @@ from ASICBlocks.BufferBlock import Buffer
 def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False):
     if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
-    df_ePortRxDataGroup, df_BX_CNT = loadEportRXData(inputDir)
+    df_ePortRxDataGroup, df_BX_CNT, df_SimEnergyStatus = loadEportRXData(inputDir,SimEnergyFlag)
 
     if outputDir is None:
         outputDir = inputDir
@@ -42,11 +42,10 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     df_CALQ = Calibrate(df_F2F, CALVALUE_Registers)
 
     if SimEnergyFlag:
-        df_SimEnergyStatus = pd.read_csv(f'{inputDir}/SimEnergyStatus.csv')
-        print(df_CALQ)
-        print(df_SimEnergyStatus)
-        df_CALQ['SimEnergyPresent'] = df_SimEnergyStatus[['SimEnergyPresent']].values
+        df_CALQ = df_CALQ.merge(df_SimEnergyStatus,left_index=True, right_index=True,how='left')
+#        df_CALQ['SimEnergyPresent'] = df_SimEnergyStatus[['SimEnergyPresent']].values
         df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=saveIndex)
+        df_CALQ.drop('entry',axis=1,inplace=True)
         df_CALQ.drop('SimEnergyPresent',axis=1,inplace=True)
     else:
         df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=saveIndex)

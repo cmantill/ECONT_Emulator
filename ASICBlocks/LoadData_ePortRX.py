@@ -12,7 +12,7 @@ def loadMetaData(_inputDir):
     return subdet, layer, wafer, isHDM, geomVersion
 
 
-def loadEportRXData(_inputDir):
+def loadEportRXData(_inputDir, simEnergy=False):
     df = None
     for fileName in ['EPORTRX_data','EPORTRX_output']:
         try:
@@ -22,6 +22,14 @@ def loadEportRXData(_inputDir):
             continue
     if df is None:
         raise AttributeError("Input data not found")
+
+    df_SimEnergyStatus=None
+    if simEnergy:
+        try:
+            df_SimEnergyStatus = pd.read_csv(f'{_inputDir}/SimEnergyStatus.csv')
+        except:
+            raise AttributeError('SimEnergy csv is missing')
+        df = df.merge(df_SimEnergyStatus,on='entry',how='left').fillna(0)
 
     if not 'Orbit' in df.columns:
         df['Orbit'] = (np.arange(len(df))/3564).astype(int)
@@ -50,7 +58,10 @@ def loadEportRXData(_inputDir):
 
     df_BX_CNT = pd.DataFrame(headers, columns=['BX_CNT'], index=df.index)
 
-    return df[columns], df_BX_CNT
+    if simEnergy:
+        df_SimEnergyStatus = df[['SimEnergyPresent','entry']].astype(int)
+
+    return df[columns], df_BX_CNT, df_SimEnergyStatus
 
 def splitEportRXData(df_ePortRxDataGroup):
     Mux_in_headers = np.array([f'Mux_in_{i}' for i in range(48)])

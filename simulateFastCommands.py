@@ -16,6 +16,7 @@ allowedFastCommands = ['ocr','bcr','chipsync','linkresetecont','linkresetroct']
 def parseConfig(configName):
     offsetChanges = []
     fastCommands = []
+    fixedPattern = None
 
     with open(configName,'r') as configFile:
         for i, line in enumerate(configFile):
@@ -34,7 +35,6 @@ def parseConfig(configName):
                 line = line[1:]
 
             values = line.split(' ')
-
             if values[2].lower()=='offset':
                 if not len(values)==5:
                     print('-'*20)
@@ -45,9 +45,19 @@ def parseConfig(configName):
                 offsetChanges.append([int(values[0]),int(values[1]),int(values[3]),int(values[4])])
             elif values[2].lower() in allowedFastCommands:
                 fastCommands.append([values[2].lower(),int(values[0]),int(values[1])])
+            elif values[2].lower()=='fixedpattern':
+                pattern = values[4]
+                length = values[3]
+                if len(pattern)==28 or pattern.startswith('0b'):
+                    pattern = int(pattern,2)
+                elif pattern.startswith('0x'):
+                    pattern = int(pattern,16)
+                else:
+                    pattern = int(pattern)
+                fixedPattern = [int(values[0]),int(values[1]), int(length), pattern]
             else:
                 print(f'Unknown command {values[2]}, skipping')
-    return offsetChanges, fastCommands
+    return offsetChanges, fastCommands, fixedPattern
 
 
 fullFastCommandList = ["FASTCMD_NOT_IDLE", "FASTCMD_PREL1A", "FASTCMD_L1A", "FASTCMD_L1A_PREL1A", "FASTCMD_L1A_NZS", "FASTCMD_L1A_NZS_PREL1A", "FASTCMD_L1A_BCR", "FASTCMD_L1A_BCR_PREL1A", "FASTCMD_L1A_CALPULSEINT", "FASTCMD_L1A_CALPULSEEXT", "FASTCMD_L1A_CALPULSEINT_PREL1A", "FASTCMD_L1A_CALPULSEEXT_PREL1A", "FASTCMD_BCR", "FASTCMD_BCR_PREL1A", "FASTCMD_BCR_OCR", "FASTCMD_CALPULSEINT", "FASTCMD_CALPULSEEXT", "FASTCMD_CALPULSEINT_PREL1A", "FASTCMD_CALPULSEEXT_PREL1A", "FASTCMD_CHIPSYNC", "FASTCMD_EBR", "FASTCMD_ECR", "FASTCMD_LINKRESETROCT", "FASTCMD_LINKRESETROCD", "FASTCMD_LINKRESETECONT", "FASTCMD_LINKRESETECOND", "FASTCMD_SPARE_0", "FASTCMD_SPARE_1", "FASTCMD_SPARE_2", "FASTCMD_SPARE_3", "FASTCMD_SPARE_4", "FASTCMD_SPARE_5", "FASTCMD_SPARE_6", "FASTCMD_SPARE_7"]
@@ -128,13 +138,20 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
 
     offsetChanges = []
     fastCommands = []
+    fixedPattern = None
 
     if not configFile is None:
-        offsetChanges, fastCommands = parseConfig(configFile)
+        offsetChanges, fastCommands, fixedPattern = parseConfig(configFile)
     elif not randomFastCommands == -1:
         offsetChanges, fastCommands = produceRandomFastCommandsAndOffsets(randomFastCommands, N)
         print (offsetChanges)
         print (fastCommands)
+
+    if not fixedPattern is None:
+        startOrbit, startBX, fixedPatternLength, fixedPatternValue = fixedPattern
+        bxNumber = startOrbit*3564 + startBX
+        fixedPatternArray = np.array([[fixedPatternValue]*12]*fixedPatternLength)
+        eportRXData[[f'ePortRxDataGroup_{i}' for i in range(12)]] = np.concatenate([eportRXData.values[:bxNumber,4:16],fixedPatternArray,eportRXData.values[bxNumber+fixedPatternLength:,4:16]],axis=0)[:N]
 
     offsetChanges.sort()
     fastCommands.sort()
@@ -274,6 +291,7 @@ if __name__=='__main__':
     parser.add_argument('-N', type=int, default = -1,dest="N", help="Number of BX to use, -1 is all in input (default: -1)")
     parser.add_argument('--random', default = False,dest="RandomSampling", action='store_true', help="Use random sampling of input data to increase statistics")
     parser.add_argument('--randomFast','--randomFastCommands', default = -1, type=float, dest='randomFastCommands', help='issue random fast commands a certain percent of the time (default is -1, which is off)')
+    parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
     parser.add_argument('-L', type=int, default = -1,dest="NLinks", help="Number of ePortTX links to use, -1 is all in input (default: -1)")
     parser.add_argument('--counterReset', type=int, default = 0,dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 0)")
 
@@ -294,9 +312,9 @@ if __name__=='__main__':
                                                           makeOffsetChange=False,
                                                           randomSampling=args.RandomSampling)
 
-    runEmulator(tempOutputDir, ePortTx=args.NLinks)
+    runEmulator(tempOutputDir, ePortTx=args.NLinks, StopAtAlgoBlock=args.StopAtAlgoBlock)
 
-    makeVerificationData(tempOutputDir, args.outputDir)
+    makeVerificationData(tempOutputDir, args.outputDir, stopAtAlgoBlock=args.StopAtAlgoBlock)
 
     shutil.rmtree(tempOutputDir)
     

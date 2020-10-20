@@ -46,13 +46,14 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
 #        df_CALQ['SimEnergyPresent'] = df_SimEnergyStatus[['SimEnergyPresent']].values
         df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=saveIndex)
         df_CALQ.drop('entry',axis=1,inplace=True)
-        df_CALQ.drop('SimEnergyPresent',axis=1,inplace=True)
+        df_CALQ.drop('SimEnergyTotal',axis=1,inplace=True)
     else:
         df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=saveIndex)
 
-    if StopAtAlgoBlock: return
+    pd.DataFrame([Mux_Select], columns=[f'MUX_SELECT_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/Mux_Select.csv', index=saveIndex)
+    pd.DataFrame([CALVALUE_Registers], columns=[f'CALVALUE_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/CALVALUE.csv', index=saveIndex)
+    pd.DataFrame([[int(isHDM)]], columns=['HIGH_DENSITY'],index=df_CALQ.index).to_csv(f'{outputDir}/HighDensity.csv', index=saveIndex)
 
-    print('Algorithm')
     df_BX_CNT.to_csv(f'{outputDir}/BX_CNT.csv',index=saveIndex)
     df_ePortRxDataGroup.to_csv(f'{outputDir}/ePortRxDataGroup.csv',index=saveIndex)
     df_Mux_in.to_csv(f'{outputDir}/Mux_in.csv',index=saveIndex)
@@ -63,6 +64,10 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     del df_Mux_out
     del df_F2F
 
+
+    if StopAtAlgoBlock: return
+
+    print('Algorithm')
 
     if nDropBits==-1:
         DropLSB=3 if isHDM else 1
@@ -89,11 +94,8 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
         STC_TYPE = STC_Type
 
 
-    pd.DataFrame([Mux_Select], columns=[f'MUX_SELECT_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/Mux_Select.csv', index=saveIndex)
-    pd.DataFrame([CALVALUE_Registers], columns=[f'CALVALUE_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/CALVALUE.csv', index=saveIndex)
     pd.DataFrame([THRESHV_Registers], columns=[f'THRESHV_{i}' for i in range(48)],index=df_CALQ.index).to_csv(f'{outputDir}/THRESHV.csv', index=saveIndex)
     pd.DataFrame([[DropLSB]], columns=['DROP_LSB'],index=df_CALQ.index).to_csv(f'{outputDir}/DropLSB.csv', index=saveIndex)
-    pd.DataFrame([[int(isHDM)]], columns=['HIGH_DENSITY'],index=df_CALQ.index).to_csv(f'{outputDir}/HighDensity.csv', index=saveIndex)
     pd.DataFrame([[TxSyncWord]], columns=['TXSYNCWORD'],index=df_CALQ.index).to_csv(f'{outputDir}/TxSyncWord.csv', index=saveIndex)
     pd.DataFrame([[EPORTTX_NUMEN]], columns=['EPORTTX_NUMEN'],index=df_CALQ.index).to_csv(f'{outputDir}/EPORTTX_NUMEN.csv', index=saveIndex)
     pd.DataFrame([[STC_TYPE]], columns=['STC_TYPE'],index=df_CALQ.index).to_csv(f'{outputDir}/STC_TYPE.csv', index=saveIndex)

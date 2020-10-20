@@ -26,7 +26,7 @@ def loadEportRXData(_inputDir, simEnergy=False):
     df_SimEnergyStatus=None
     if simEnergy:
         try:
-            df_SimEnergyStatus = pd.read_csv(f'{_inputDir}/SimEnergyStatus.csv')
+            df_SimEnergyStatus = pd.read_csv(f'{_inputDir}/SimEnergyTotal.csv')
         except:
             raise AttributeError('SimEnergy csv is missing')
         df = df.merge(df_SimEnergyStatus,on='entry',how='left').fillna(0)
@@ -59,8 +59,10 @@ def loadEportRXData(_inputDir, simEnergy=False):
     df_BX_CNT = pd.DataFrame(headers, columns=['BX_CNT'], index=df.index)
 
     if simEnergy:
-        df_SimEnergyStatus = df[['SimEnergyPresent','entry']].astype(int)
-
+        if 'EventSimEnergy' in df.columns:
+            df_SimEnergyStatus = df[['SimEnergyTotal','EventSimEnergy','entry']]
+        else:
+            df_SimEnergyStatus = df[['SimEnergyTotal','entry']]
     return df[columns], df_BX_CNT, df_SimEnergyStatus
 
 def splitEportRXData(df_ePortRxDataGroup):

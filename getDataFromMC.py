@@ -76,6 +76,8 @@ def processTree(_tree, geomDF, subdet, layer, wafer=None, geomVersion="v11", job
         df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt','simenergy']
     df.reset_index('subentry',drop=True,inplace=True)
 
+    df['simenergyEvent'] = df.groupby('entry').simenergy.sum()
+
     #remove unwanted layers
     df = df[(df.subdet==subdet) & (df.layer==layer)]
 
@@ -160,8 +162,9 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
 
     encodedlist   = gb[['ECON_TC_Number_PreMux','encodedCharge']].apply(makeTCindexCols,'encodedCharge',-1,'ECON_TC_Number_PreMux')
 
-    simEnergy =gb[['simenergy']].sum()>0
-    simEnergy.columns=['SimEnergyPresent']
+    simEnergy =gb[['simenergy']].sum()
+    simEnergy[['eventSimEnergy']] =gb[['simenergyEvent']].mean()
+    simEnergy.columns=['SimEnergyTotal','EventSimEnergy']
 
     df_out     = pd.DataFrame(index=encodedlist.index)
     df_out[ENCODED_headers]= pd.DataFrame((encodedlist).values.tolist(),index=encodedlist.index)
@@ -217,7 +220,7 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
         waferInput.fillna(0,inplace=True)            
         waferInput.astype(int).to_csv(f"{waferDir}/EPORTRX_data.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
 
-        simEnergy.loc[_wafer].astype(int).to_csv(f"{waferDir}/SimEnergyStatus.csv",columns=["SimEnergyPresent"],index='entry', mode=writeMode, header=header)
+        simEnergy.loc[_wafer].to_csv(f"{waferDir}/SimEnergyTotal.csv",columns=["SimEnergyTotal","EventSimEnergy"],index='entry', mode=writeMode, header=header)
 
 
         isHDM = df[df.wafer==_wafer].head().isHDM.any()
@@ -322,7 +325,7 @@ def main(opt,args):
     fileName = opt.inputFile
     fileNameContent = opt.inputFileFormat
     eosDir = opt.eosDir
-
+    print(fileName)
     if fileName is None:
         if fileNameContent is None:
             if geomVersion=='v10':
@@ -366,8 +369,9 @@ def main(opt,args):
             stopFileNum = int((jobNumber+1)*filesPerJob)
     if not opt.Nfiles==-1:
         stopFileNum = startFileNum + opt.Nfiles
+    if stopFileNum in [-1,len(fileList)]:
+        stopFileNum=None
     fileList = fileList[startFileNum:stopFileNum]
-
 
     if geomVersion in ['v10','v11']:
         geomDF = getGeomDF_V10()
@@ -375,9 +379,12 @@ def main(opt,args):
         geomDF = getGeomDF_V9()
 
     waferList = []
+    print('HERE')
+    print(fileList)
     for i,fName in enumerate(fileList):
         print(i, fName)
         wafer = opt.wafer
+        print(wafer)
         if wafer is None:
             wafer = []
         if -1 in wafer:
@@ -388,6 +395,8 @@ def main(opt,args):
                     u = opt.waferu[j]
                     v = opt.waferv[j]
                     wafer.append(u*100 + v)
+        
+        print(wafer)
         _waferList = processNtupleInputs(fName, geomDF, subdet, layer, wafer, opt.odir, opt.Nevents, opt.chunkSize, geomVersion=geomVersion, appendFile=i>0, jobInfo=jobSplitText, zeroSuppress=opt.zeroSuppress)
 
         waferList = list(set(list(_waferList) + waferList))

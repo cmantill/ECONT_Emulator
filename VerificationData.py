@@ -277,17 +277,18 @@ def FormatBuffer(inputDir, outputDir):
         if not os.path.exists(f'{outputDir}/{fDest}'):
             os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
 
-def makeVerificationData(inputDir, outputDir):
+def makeVerificationData(inputDir, outputDir, stopAtAlgoBlock=False):
 
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
 
     shutil.copy(f'{inputDir}/metaData.py',f'{outputDir}/metaData.py')
 
-    AlgoTestBench(inputDir, outputDir)
-    FormatBuffer(inputDir, outputDir)
-    MuxFixCalibTestBench(inputDir, outputDir)
     EPortRXTestBench(inputDir, outputDir)
+    MuxFixCalibTestBench(inputDir, outputDir)
+    if not stopAtAlgoBlock:
+        AlgoTestBench(inputDir, outputDir)
+        FormatBuffer(inputDir, outputDir)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()

@@ -43,10 +43,14 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
 
     if SimEnergyFlag:
         df_CALQ = df_CALQ.merge(df_SimEnergyStatus,left_index=True, right_index=True,how='left')
-#        df_CALQ['SimEnergyPresent'] = df_SimEnergyStatus[['SimEnergyPresent']].values
+
+        df_CALQ['SimEnergyFraction'] = df_CALQ['SimEnergyTotal']/df_CALQ['EventSimEnergy']
+
         df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=saveIndex)
         df_CALQ.drop('entry',axis=1,inplace=True)
         df_CALQ.drop('SimEnergyTotal',axis=1,inplace=True)
+        df_CALQ.drop('EventSimEnergy',axis=1,inplace=True)
+        df_CALQ.drop('SimEnergyFraction',axis=1,inplace=True)
     else:
         df_CALQ.to_csv(f'{outputDir}/CALQ.csv',index=saveIndex)
 

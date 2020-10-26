@@ -13,6 +13,9 @@ from VerificationData import makeVerificationData
 
 allowedFastCommands = ['ocr','bcr','chipsync','linkresetecont','linkresetroct']
 
+STARTUP_OFFSET_ORBITS = 1
+STARTUP_OFFSET_BUCKETS = 660
+
 def parseConfig(configName):
     offsetChanges = []
     fastCommands = []
@@ -122,8 +125,10 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
     
     dataCols = [f'ePortRxDataGroup_{i}' for i in range(12)]
 
-    eportRXData['GOD_ORBIT_NUMBER'] = (np.arange(N)/3564).astype(int)
-    eportRXData['GOD_BUCKET_NUMBER'] = np.arange(N)%3564
+    global_BX_Number = np.arange(N) + STARTUP_OFFSET_ORBITS*3564 + STARTUP_OFFSET_BUCKETS
+
+    eportRXData['GOD_ORBIT_NUMBER'] = (global_BX_Number/3564).astype(int)
+    eportRXData['GOD_BUCKET_NUMBER'] = global_BX_Number%3564
 
     eportRXData['FASTCMD']='FASTCMD_IDLE'
     eportRXData['DATA_SYNCH']='DATA'
@@ -149,7 +154,7 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
 
     if not fixedPattern is None:
         startOrbit, startBX, fixedPatternLength, fixedPatternValue = fixedPattern
-        bxNumber = startOrbit*3564 + startBX
+        bxNumber = (startOrbit-STARTUP_OFFSET_ORBITS)*3564 + startBX - STARTUP_OFFSET_BUCKETS
         fixedPatternArray = np.array([[fixedPatternValue]*12]*fixedPatternLength)
         eportRXData[[f'ePortRxDataGroup_{i}' for i in range(12)]] = np.concatenate([eportRXData.values[:bxNumber,4:16],fixedPatternArray,eportRXData.values[bxNumber+fixedPatternLength:,4:16]],axis=0)[:N]
 
@@ -164,7 +169,7 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
             _command = f[0]
             _orbit = f[1]
             _bucket = f[2]
-            _globalBX = _orbit* 3564 + _bucket
+            _globalBX = (_orbit-STARTUP_OFFSET_ORBITS)* 3564 + _bucket - STARTUP_OFFSET_BUCKETS
             if _globalBX>N:
                 print(f'A fast command ({_command}) is issued for a BX ({_orbit},{_bucket}), beyond the maximum used ({N}), skipping this command')
                 continue
@@ -177,38 +182,27 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
 
 
     #keep a global bunch crosing nubmer.  This can be used to later recreate the header                                                                                                                        
-    globalBXCounter = np.arange(N) % 3564
+    globalBXCounter = global_BX_Number % 3564
 
     for f in fastCommands:
         _command = f[0]
         _orbit = f[1]
         _bucket = f[2]
-        _globalBX = _orbit* 3564 + _bucket
+        _globalBX = (_orbit-STARTUP_OFFSET_ORBITS)* 3564 + _bucket-STARTUP_OFFSET_BUCKETS
 
         if ('ocr' in _command.lower()) or ('bcr' in _command.lower()) or ('chipsync' in _command.lower()):
             globalBXCounter[_globalBX:-1] = (np.arange(len(globalBXCounter[_globalBX:-1])) + ORBSYN_CNT_LOAD_VAL) % 3564
 
-    # set header, with BX counter after the fast commands
-
-    header = np.zeros(N,dtype=int) + 10
-    header[globalBXCounter==0] = 9
-
-    eportRXData.loc[header==9,'DATA_SYNCH'] = 'SYNCH'
-
-    for c in dataCols:
-        eportRXData[c] = eportRXData[c] + (header<<28)
-
-
     #do link resets
-    idle_packet = 2899102924 #0xaccccccc
-
+    ###    idle_packet = 2899102924 #0xaccccccc
+    idle_packet = 214748364 #0xccccccc (a or 9 in front gets added from header)
     econtLinkReset=pd.DataFrame({'LINKRESETECONT':[0]*N},index=eportRXData.index)
 
     for f in fastCommands:
         _command = f[0]
         _orbit = f[1]
         _bucket = f[2]
-        _globalBX = _orbit* 3564 + _bucket
+        _globalBX = (_orbit-STARTUP_OFFSET_ORBITS)* 3564 + _bucket-STARTUP_OFFSET_BUCKETS
 
         if 'linkresetroct' in _command.lower():
             _bxSyncEnd = _globalBX + 255
@@ -230,9 +224,22 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
         _command = f[0]
         _orbit = f[1]
         _bucket = f[2]
-        _globalBX = _orbit* 3564 + _bucket
+        _globalBX = (_orbit-STARTUP_OFFSET_ORBITS)* 3564 + _bucket-STARTUP_OFFSET_BUCKETS
 
         eportRXData.loc[_globalBX,'FASTCMD'] = ("FASTCMD_"+_command.upper()) if not 'FASTCMD' in _command else _command
+
+
+    # set header, with BX counter after the fast commands
+
+    header = np.zeros(N,dtype=int) + 10
+    header[globalBXCounter==0] = 9
+
+    eportRXData.loc[header==9,'DATA_SYNCH'] = 'SYNCH'
+
+    for c in dataCols:
+        eportRXData[c] = eportRXData[c] + (header<<28)
+
+
 
     for c in offsetChanges:
         _orbit = c[0]
@@ -240,7 +247,7 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
         _eport = c[2]
         _newVal = c[3]
 
-        _globalBX = _orbit* 3564 + _bucket
+        _globalBX = (_orbit-STARTUP_OFFSET_ORBITS)* 3564 + _bucket-STARTUP_OFFSET_BUCKETS
 
         if _globalBX >= len(eportRXData):
             warnings.warn(f'Bucket to change ({_orbit},{_bucket}) is beyond the size of the test ({len(eportRXData)}), ignoring this change')
@@ -293,7 +300,7 @@ if __name__=='__main__':
     parser.add_argument('--randomFast','--randomFastCommands', default = -1, type=float, dest='randomFastCommands', help='issue random fast commands a certain percent of the time (default is -1, which is off)')
     parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
     parser.add_argument('-L', type=int, default = -1,dest="NLinks", help="Number of ePortTX links to use, -1 is all in input (default: -1)")
-    parser.add_argument('--counterReset', type=int, default = 0,dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 0)")
+    parser.add_argument('--counterReset', type=int, default = 3513,dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 3513)")
 
 
     args = parser.parse_args()

@@ -240,6 +240,7 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
         eportRXData[c] = eportRXData[c] + (header<<28)
 
 
+    offsets = [0]*12
 
     for c in offsetChanges:
         _orbit = c[0]
@@ -248,25 +249,23 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
         _newVal = c[3]
 
         _globalBX = (_orbit-STARTUP_OFFSET_ORBITS)* 3564 + _bucket-STARTUP_OFFSET_BUCKETS
+        if _orbit==-1 or _bucket==-1:
+            _globalBX = 0
 
-        if _globalBX >= len(eportRXData):
-            warnings.warn(f'Bucket to change ({_orbit},{_bucket}) is beyond the size of the test ({len(eportRXData)}), ignoring this change')
-            continue
-        if not eportRXData.loc[_globalBX,'OFFSET'] == -1:
-            warnings.warn(f'Already changing on eport ({eportRXData.loc[_globalBX,"OFFSET"]}) in this bucket ({_orbit},{_bucket}), ignoring change to eport {_eport}')
-            continue
+        if _orbit >=0 and _bucket >=0:
+            if _globalBX >= len(eportRXData):
+                warnings.warn(f'Bucket to change ({_orbit},{_bucket}) is beyond the size of the test ({len(eportRXData)}), ignoring this change')
+                continue
+            if not eportRXData.loc[_globalBX,'OFFSET'] == -1:
+                warnings.warn(f'Already changing on eport ({eportRXData.loc[_globalBX,"OFFSET"]}) in this bucket ({_orbit},{_bucket}), ignoring change to eport {_eport}')
+                continue
 
-        eportRXData.loc[_globalBX,'OFFSET_STATUS'] = 'CHANGE'
-        eportRXData.loc[_globalBX,'OFFSET_CHANNEL'] = _eport
-        eportRXData.loc[_globalBX,'OFFSET'] = _newVal
+            eportRXData.loc[_globalBX,'OFFSET_STATUS'] = 'CHANGE'
+            eportRXData.loc[_globalBX,'OFFSET_CHANNEL'] = _eport
+            eportRXData.loc[_globalBX,'OFFSET'] = _newVal
 
         if makeOffsetChange:
-            _column = f'DATA_{_eport}'
-
-            #convert data columns to binary
-            for c in dataCols:
-                eportRXData[_columns] = eportRXData[columns].apply(bin).str[2:]
-
+            _column = f'ePortRxDataGroup_{_eport}'
 
             startingData = ''.join(eportRXData.loc[_globalBX:,_column].astype(int).apply(bin).str[2:].values)
 
@@ -279,8 +278,10 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
             else:
                 newData = startingData
 
-            newData = [newData[i*32:(i+1)*32] for i in range(int(len(newData)/32))]
+            newData = [int(newData[i*32:(i+1)*32],2) for i in range(int(len(newData)/32))]
+
             eportRXData.loc[_globalBX:,_column] = newData
+
 
     eportRXData.to_csv(outputFile,index=False)
     econtLinkReset.to_csv(f'{outputDir}/LinkResetEconT.csv',index=False)
@@ -316,7 +317,7 @@ if __name__=='__main__':
                                                           randomFastCommands = args.randomFastCommands,
                                                           N = args.N,
                                                           ORBSYN_CNT_LOAD_VAL=args.ORBSYN_CNT_LOAD_VAL,
-                                                          makeOffsetChange=False,
+                                                          makeOffsetChange=True,
                                                           randomSampling=args.RandomSampling)
 
     runEmulator(tempOutputDir, ePortTx=args.NLinks, StopAtAlgoBlock=args.StopAtAlgoBlock)

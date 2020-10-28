@@ -28,9 +28,11 @@ def EPortRXTestBench(inputDir, outputDir):
     ]
 
     for fSrc, fDest in linkFiles:
-        if not os.path.exists(f'{outputDir}/{fDest}'):
+        try:
             os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
-    
+        except:
+            print (f'link exists for {fDest}, skipping')
+
     shutil.copy(f'{inputDir}/ORBSYN_CNT_LOAD_VAL.csv',f'{outputDir}/EPortRX_Input_ORBSYN_CNT_LOAD_VAL.csv')
     NewFiles.append('EPortRX_Input_ORBSYN_CNT_LOAD_VAL.csv')
     shutil.copy(f'{inputDir}/EPORTRX_data.csv',f'{outputDir}/EPortRX_Input_EPORTRX_data.csv')
@@ -47,9 +49,11 @@ def MuxFixCalibTestBench(inputDir, outputDir):
     ]
 
     for fSrc, fDest in linkFiles:
-        if not os.path.exists(f'{outputDir}/{fDest}'):
+        try:
             os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
-    
+        except:
+            print (f'link exists for {fDest}, skipping')
+
     #copy registers 
     shutil.copy(f'{inputDir}/HighDensity.csv', f'{outputDir}/MuxFixCalib_Input_HighDensity.csv')
     NewFiles.append('MuxFixCalib_Input_HighDensity.csv')
@@ -274,8 +278,10 @@ def FormatBuffer(inputDir, outputDir):
              ]
 
     for fSrc, fDest in linkFiles:
-        if not os.path.exists(f'{outputDir}/{fDest}'):
+        try:
             os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
+        except:
+            print (f'link exists for {fDest}, skipping')
 
 def makeVerificationData(inputDir, outputDir, stopAtAlgoBlock=False):
 

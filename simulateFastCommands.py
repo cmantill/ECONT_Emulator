@@ -158,6 +158,13 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
             fixedPatternArray = np.array([[fixedPatternValue]*12]*fixedPatternLength)
             eportRXData[[f'ePortRxDataGroup_{i}' for i in range(12)]] = np.concatenate([eportRXData.values[:bxNumber,4:16],fixedPatternArray,eportRXData.values[bxNumber+fixedPatternLength:,4:16]],axis=0)[:N]
 
+    if ORBSYN_CNT_LOAD_VAL>-1:
+        godOrbitNumbers = eportRXData.GOD_ORBIT_NUMBER.values
+        godBucketNumbers = eportRXData.GOD_BUCKET_NUMBER.values
+        resetOrbitNumbers = godOrbitNumbers[godBucketNumbers==ORBSYN_CNT_LOAD_VAL]
+        for r in resetOrbitNumbers:
+            fastCommands.append(['LINKRESETROCT',r,ORBSYN_CNT_LOAD_VAL])
+
     offsetChanges.sort()
     fastCommands.sort()
 
@@ -169,7 +176,6 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
             _command = f[0]
             _orbit = f[1]
             _bucket = f[2]
-
             _globalBX = (_orbit-STARTUP_OFFSET_ORBITS)* 3564 + _bucket - STARTUP_OFFSET_BUCKETS
             if _globalBX<0:
                 print(f'A fast command ({_command}) is issued for a BX ({_orbit},{_bucket}), is issued before the startup delay ({STARTUP_OFFSET_ORBITS},{STARTUP_OFFSET_BUCKETS}), skipping this command')
@@ -317,8 +323,9 @@ if __name__=='__main__':
     os.makedirs(tempOutputDir,exist_ok=True)
 
     configFile = args.configFile
-    if configFile.lower()=="none":
-        configFile=None
+    if not configFile is None:
+        if configFile.lower()=="none":
+            configFile=None
 
     offsetChanges, fastCommands, N = produceEportRX_input(inputDir = args.inputDir, 
                                                           outputDir = tempOutputDir, 

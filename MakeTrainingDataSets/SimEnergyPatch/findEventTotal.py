@@ -20,9 +20,10 @@ for layer in layers:
     ##copy locally
     
     ## untar
-    try:
+    if os.path.exists(f'tar -zxf {sample}Data_v11Geom_layer_{layer}_job{jobN}.tgz'):
         os.system(f'tar -zxf {sample}Data_v11Geom_layer_{layer}_job{jobN}.tgz')
     except:
+        print(f'tar file not found, skipping layer {layer}')
         continue
 
     ##get data

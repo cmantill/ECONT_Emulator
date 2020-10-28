@@ -97,7 +97,7 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
                 print('Exiting')
                 exit()
             eportRXData = eportRXData[[f'ePortRxDataGroup_{i}' for i in range(12)]] & 268435455
-
+            print ("  Loading from EPortRX_Input_EPORTRX_data.csv successful")
         except:
             print('Unable to load eportRX data, exiting')
             exit()
@@ -316,9 +316,13 @@ if __name__=='__main__':
     tempOutputDir = (args.outputDir+"/temp").replace("//","/")
     os.makedirs(tempOutputDir,exist_ok=True)
 
+    configFile = args.configFile
+    if configFile.lower()=="none":
+        configFile=None
+
     offsetChanges, fastCommands, N = produceEportRX_input(inputDir = args.inputDir, 
                                                           outputDir = tempOutputDir, 
-                                                          configFile = args.configFile,
+                                                          configFile = configFile,
                                                           randomFastCommands = args.randomFastCommands,
                                                           N = args.N,
                                                           ORBSYN_CNT_LOAD_VAL=args.ORBSYN_CNT_LOAD_VAL,

@@ -13,9 +13,6 @@ from VerificationData import makeVerificationData
 
 allowedFastCommands = ['ocr','bcr','chipsync','linkresetecont','linkresetroct']
 
-STARTUP_OFFSET_ORBITS = 1
-STARTUP_OFFSET_BUCKETS = 660
-
 def parseConfig(configName):
     offsetChanges = []
     fastCommands = []
@@ -80,8 +77,7 @@ def produceRandomFastCommandsAndOffsets(fastCommandPercent, N):
 
     return offsetChanges, fastCommands
 
-
-def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommands=-1, N=-1, ORBSYN_CNT_LOAD_VAL=0, makeOffsetChange=False, randomSampling=False):
+def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommands=-1, N=-1, ORBSYN_CNT_LOAD_VAL=0, makeOffsetChange=False, STARTUP_OFFSET_ORBITS=0, STARTUP_OFFSET_BUCKETS=0, randomSampling=False):
 
     inputFile=f'{inputDir}/EPORTRX_data.csv'
     outputFile=f'{outputDir}/EPORTRX_data.csv'
@@ -155,8 +151,12 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
     if not fixedPattern is None:
         startOrbit, startBX, fixedPatternLength, fixedPatternValue = fixedPattern
         bxNumber = (startOrbit-STARTUP_OFFSET_ORBITS)*3564 + startBX - STARTUP_OFFSET_BUCKETS
-        fixedPatternArray = np.array([[fixedPatternValue]*12]*fixedPatternLength)
-        eportRXData[[f'ePortRxDataGroup_{i}' for i in range(12)]] = np.concatenate([eportRXData.values[:bxNumber,4:16],fixedPatternArray,eportRXData.values[bxNumber+fixedPatternLength:,4:16]],axis=0)[:N]
+        
+        if bxNumber<0:
+            print('fixed pattern begins before startup, skipping')
+        else:
+            fixedPatternArray = np.array([[fixedPatternValue]*12]*fixedPatternLength)
+            eportRXData[[f'ePortRxDataGroup_{i}' for i in range(12)]] = np.concatenate([eportRXData.values[:bxNumber,4:16],fixedPatternArray,eportRXData.values[bxNumber+fixedPatternLength:,4:16]],axis=0)[:N]
 
     offsetChanges.sort()
     fastCommands.sort()
@@ -169,7 +169,11 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
             _command = f[0]
             _orbit = f[1]
             _bucket = f[2]
+
             _globalBX = (_orbit-STARTUP_OFFSET_ORBITS)* 3564 + _bucket - STARTUP_OFFSET_BUCKETS
+            if _globalBX<0:
+                print(f'A fast command ({_command}) is issued for a BX ({_orbit},{_bucket}), is issued before the startup delay ({STARTUP_OFFSET_ORBITS},{STARTUP_OFFSET_BUCKETS}), skipping this command')
+                continue
             if _globalBX>N:
                 print(f'A fast command ({_command}) is issued for a BX ({_orbit},{_bucket}), beyond the maximum used ({N}), skipping this command')
                 continue
@@ -301,8 +305,9 @@ if __name__=='__main__':
     parser.add_argument('--randomFast','--randomFastCommands', default = -1, type=float, dest='randomFastCommands', help='issue random fast commands a certain percent of the time (default is -1, which is off)')
     parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
     parser.add_argument('-L', type=int, default = -1,dest="NLinks", help="Number of ePortTX links to use, -1 is all in input (default: -1)")
+    parser.add_argument('--GodOrbitOffset', type=int, default = 1, dest="GodOrbitOffset", help="Offset in GodOrbit number caused by the startup (default 1)")
+    parser.add_argument('--GodBucketOffset', type=int, default = 660, dest="GodBucketOffset", help="Offset in GodBucket number caused by the startup (default 660)")
     parser.add_argument('--counterReset', type=int, default = 3513,dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 3513)")
-
 
     args = parser.parse_args()
 
@@ -318,6 +323,8 @@ if __name__=='__main__':
                                                           N = args.N,
                                                           ORBSYN_CNT_LOAD_VAL=args.ORBSYN_CNT_LOAD_VAL,
                                                           makeOffsetChange=True,
+                                                          STARTUP_OFFSET_ORBITS = args.GodOrbitOffset,
+                                                          STARTUP_OFFSET_BUCKETS = args.GodBucketOffset,
                                                           randomSampling=args.RandomSampling)
 
     runEmulator(tempOutputDir, ePortTx=args.NLinks, StopAtAlgoBlock=args.StopAtAlgoBlock)

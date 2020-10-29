@@ -163,7 +163,7 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
         godBucketNumbers = eportRXData.GOD_BUCKET_NUMBER.values
         resetOrbitNumbers = godOrbitNumbers[godBucketNumbers==ORBSYN_CNT_LOAD_VAL]
         for r in resetOrbitNumbers:
-            fastCommands.append(['LINKRESETROCT',r,ORBSYN_CNT_LOAD_VAL])
+            fastCommands.append(['BCR',r,ORBSYN_CNT_LOAD_VAL])
 
     offsetChanges.sort()
     fastCommands.sort()

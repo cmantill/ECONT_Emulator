@@ -16,5 +16,5 @@ cols = [f'ePortRxDataGroup_{i}' for i in range(12)]
 
 df[cols] = vHex(df[cols])
 
-df.to_csv(inputFile.replace('.csv','_HEX.csv'))
+df.to_csv(inputFile.replace('.csv','_HEX.csv'),index=None)
 

@@ -8,7 +8,7 @@ args = parser.parse_args()
 
 inputFile = args.input
 
-df = pd.read_csv(inputFile)
+df = pd.read_csv(inputFile,skipinitialspace=True)
 
 vHex = np.vectorize(hex)
 

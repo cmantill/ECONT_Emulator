@@ -20,4 +20,6 @@ ORBIT_SYNC_COMMAND_BUCKET=3513
 
 python3 simulateFastCommands.py -i ${INPUT_DATA_LOCATION} -o ${OUTPUT_LOCATION} --NoAlgo -c ${FAST_COMMAND_CONFIG} --GodOrbitOffset ${GOD_ORBIT_OFFSET} --GodBucketOffset ${GOD_BUCKET_OFFSET} --counterReset ${ORBIT_SYNC_COMMAND_BUCKET}
 
+python3 convertToHex.py -i ${OUTPUT_LOCATION}/EPortRX_Input_EPORTRX_data.csv
+
 deactivate

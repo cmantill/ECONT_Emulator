@@ -66,16 +66,84 @@ then
 
 fi
 
-echo "python3 getDataFromMC.py -o ${dataType}_v11Geom_layer_${layer} -d $subdet -l $layer -w -1  --Nfiles -1 --Nevents -1 --eosDir ${eosInputDir} --inputFileFormat ${inputFileFormat} --jobSplit ${jobSplit}/${jobCount} --zeroSuppress --chunkSize ${chunkSize}"
-python3 getDataFromMC.py -o ${dataType}_v11Geom_layer_${layer} -d $subdet -l $layer -w -1  --Nfiles -1 --Nevents -1 --eosDir ${eosInputDir} --inputFileFormat ${inputFileFormat} --jobSplit ${jobSplit}/${jobCount} --zeroSuppress --chunkSize ${chunkSize}
 
+# #get data from ntuples
+echo "python3 getDataFromMC.py -o ${dataType}_v11Geom_layer_${layer} -d $subdet -l $layer -w -1  --Nfiles -1 --Nevents -1 --eosDir ${eosInputDir} --inputFileFormat ${inputFileFormat} --jobSplit ${jobSplit}/${jobCount} --zeroSuppress --chunkSize ${chunkSize}"
+python3 getDataFromMC.py -o ${dataType}_v11Geom_layer_${layer} -d $subdet -l $layer -w -1  --Nfiles -1 --Nevents 100 --eosDir ${eosInputDir} --inputFileFormat ${inputFileFormat} --jobSplit ${jobSplit}/${jobCount} --zeroSuppress --chunkSize ${chunkSize}
+
+
+mkdir ${dataType}_TrainingData_PUAllocation
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_1
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_2
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_3
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_4
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_5
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_6
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_7
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_8
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_9
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_10
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_11
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_12
+mkdir ${dataType}_TrainingData_PUAllocation/nElinks_13
+mkdir ${dataType}_TrainingData_SignalAllocation
+mkdir ${dataType}_TrainingData_SignalAllocation/nElinks_2
+mkdir ${dataType}_TrainingData_SignalAllocation/nElinks_3
+mkdir ${dataType}_TrainingData_SignalAllocation/nElinks_4
+mkdir ${dataType}_TrainingData_SignalAllocation/nElinks_5
+
+
+#run emulator on data from previous step
 FILES=${dataType}_v11Geom_layer_${layer}/*
 for f in $FILES
 do
     echo "Processing $f file..."
     echo "python3 ECONT_Emulator.py --NoAlgo --AEMuxOrdering -i $f --SimEnergyFlag"
     python3 ECONT_Emulator.py --NoAlgo --AEMuxOrdering -i $f --SimEnergyFlag
+    python3 sortByLinks.py -i $f --name ${dataType} --job ${jobSplit}
 done
+
+
+FILES=${dataType}_TrainingData_SignalAllocation/*
+for f in $FILES;
+do
+    x=$(ls $f | wc -l)
+    echo $x
+    if [ $x -eq "0" ];
+    then
+        echo "Skipping $f";
+    else
+        echo $f;        
+        CSVFILES=$f/*
+        for csvF in $CSVFILES;
+        do
+            python3 mixFile.py -i $csvF
+            echo "xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/${f}"
+            xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/${f}
+        done;
+    fi
+done;
+
+FILES=${dataType}_TrainingData_PUAllocation/*
+for f in $FILES;
+do
+    x=$(ls $f | wc -l)
+    echo $x
+    if [ $x -eq "0" ];
+    then
+        echo "Skipping $f";
+    else
+        echo $f;        
+        CSVFILES=$f/*
+        for csvF in $CSVFILES;
+        do
+            python3 mixFile.py -i $csvF
+            echo "xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/${f}"
+            xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/${f}
+        done;
+    fi
+done;
+
 
 if [ -z ${_CONDOR_SCRATCH_DIR} ] ; then 
     echo "Running Interactively" ; 
@@ -83,7 +151,7 @@ else
     echo "Send data to eos and cleanup" 
     tar -zcf ${dataType}_v11Geom_layer_${layer}_job${jobSplit}.tgz ${dataType}_v11Geom_layer_${layer}
 
-    xrdcp -rf ${dataType}_v11Geom_layer_${layer}_job${jobSplit}.tgz root://cmseos.fnal.gov//store/user/lpchgcal/ECON_Verification_Data
+    xrdcp -rf ${dataType}_v11Geom_layer_${layer}_job${jobSplit}.tgz root://cmseos.fnal.gov//store/user/lpchgcal/ECON_Verification_Data/v3
     rm ${dataType}_v11Geom_layer_${layer}_job${jobSplit}.tgz
     rm -rf ${dataType}_v11Geom_layer_${layer}
     rm -rf hgcalPythonEnv

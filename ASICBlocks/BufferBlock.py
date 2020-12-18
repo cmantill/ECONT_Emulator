@@ -51,7 +51,13 @@ def Buffer(df_formatterOutput, EPORTTX_NUMEN, T1 , T2, T3):
         
         words = BufferContents[:2*EPORTTX_NUMEN]
         
-        outputData = ((words[::2]<<16) + words[1::2]).tolist()
+        #outputData = ((words[::2]<<16) + words[1::2]).tolist()
+		# This change makes it slightly harder to read the output words in
+		# order, but it correctly matches the 32-bit words we get out of the
+		# hardware.  The first 16-bit word goes into the LSB of a 32-bit output
+		# word, and the second 16-bit word goes into the MSB of the 32-bit
+		# output word.
+        outputData = ((words[1::2]<<16) + words[0::2]).tolist()
         BufferContents[0:400-2*EPORTTX_NUMEN] = BufferContents[2*EPORTTX_NUMEN:400]
         writePointer = max(writePointer-2*EPORTTX_NUMEN, 0)
 

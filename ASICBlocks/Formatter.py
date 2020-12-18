@@ -57,10 +57,12 @@ Threshold_WordsPerNTCQ = {8  : 8 ,
                           48 : 25,
                       }
                           
-def formatThresholdOutput(row,TxSynchWord=0, Use_Sum=False, debug=False):
+def formatThresholdOutput(row, debug=False):
 
     SUM_FULL =row['SUM']
     SUM_NOT_TRANSMITTED =row['SUM_NOT_TRANSMITTED']
+
+    Use_Sum = row['USE_SUM']
     CHARGEQ = row[[f'CHARGEQ_{i}' for i in range(48)]].values
 
     ADD_MAP  = row[[f'ADDRMAP_{i}' for i in range(48)]]
@@ -92,8 +94,6 @@ def formatThresholdOutput(row,TxSynchWord=0, Use_Sum=False, debug=False):
         ChargeData=''
     elif NTCQ<8:
         nChannelData=format(NTCQ, '#0%ib'%(3+2))[2:]
-        # print (ADD_MAP)        
-        # bitmap = np.array([int(x) for x in format(ADD_MAP, '#0%ib'%(48+2))[2:]][::-1])
         channelNumbers = np.arange(48)[ADD_MAP==1]
         channelNumbersBin = [format(x,'#0%ib'%(6+2))[2:] for x in channelNumbers]
         AddressMapData = ''
@@ -146,12 +146,26 @@ def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum):
 
     df_in = pd.merge(df_Threshold_Sum, df_BX_CNT, left_index=True, right_index=True)
 
-    df_Format = pd.DataFrame(df_in.apply(formatThresholdOutput, Use_Sum=Use_Sum, axis=1).values,columns=['FullDataString'],index=df_in.index)
+    if not type(Use_Sum) is pd.DataFrame:
+        if type(Use_Sum) is bool:
+            df_in['USE_SUM'] = Use_Sum
+        elif type(Use_Sum) is int or type(Use_Sum) is np.int64 or type(Use_Sum) is np.int32:
+            df_in['USE_SUM'] = Use_Sum==1
+        else:
+            print(f'Use sum should be either bool (True/False) or int (1/0), but type passed is {type(Use_Sum)}')
+            exit()
+    else:
+        df_in['USE_SUM'] = Use_Sum['USE_SUM']
+
+    df_Format = pd.DataFrame(df_in.apply(formatThresholdOutput, axis=1).values,columns=['FullDataString'],index=df_in.index)
 
     df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
 
-    df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
-
+    if type(TxSyncWord) is pd.DataFrame:
+        df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values
+    else:
+        df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+        
     frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
     df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
@@ -162,7 +176,7 @@ def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum):
     return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
 
 
-def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
+def formatBestChoiceOutput(row, nTC = 1, debug=False):
 
     nExp = 4
     nMant = 3
@@ -171,6 +185,8 @@ def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
 
     ADD_MAP = list(row[[f'BC_TC_MAP_{i}' for i in range(48)]])
     CHARGEQ = list(row[[f'BC_CHARGE_{i}' for i in range(48)]])
+
+    Use_Sum = row['USE_SUM']
 
     SUM = encode(sum(CHARGEQ[:]),0,5,3,asInt=True)
     SUM_NOT_TRANSMITTED = encode(sum(CHARGEQ[nTC:]),0,5,3,asInt=True)
@@ -200,6 +216,12 @@ def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
         
 #        bitmap = np.array([int(x) for x in format(ADD_MAP, '#0%ib'%(48+2))[2:]][::-1])
         channelNumbers = np.arange(48)[BITMAP==1]
+
+        #append address 0 for the cases where less than nTC channels are present in the bitmap.  This can happen when a channel index shows up twice in BC_TC_MAP
+        if len(channelNumbers) < nTC:
+            channelNumbers = channelNumbers.tolist() + [0]*(nTC - len(channelNumbers))
+
+
         channelNumbersBin = [format(x,'#0%ib'%(6+2))[2:] for x in channelNumbers]
 
         AddressMapData = ''
@@ -216,6 +238,7 @@ def formatBestChoiceOutput(row, nTC = 1, Use_Sum=False, debug=False):
         for x in CHARGEQ:
             ChargeData += encode(x,nDropBit,nExp,nMant,roundBits)
 
+#    formattedData = header + modSumData + nChannelData + AddressMapData + ChargeData
     formattedData = header + modSumData + AddressMapData + ChargeData
 
     if len(formattedData)%16==0:
@@ -236,12 +259,28 @@ from Utils.linkAllocation import tcPerLink
 def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum):
     df_in = pd.merge(df_BestChoice, df_BX_CNT, left_index=True, right_index=True)
 
-    df_Format = pd.DataFrame(df_in.apply(formatBestChoiceOutput, nTC=tcPerLink[EPORTTX_NUMEN], Use_Sum=Use_Sum, axis=1).values,columns=['FullDataString'],index=df_in.index)
+    if not type(Use_Sum) is pd.DataFrame:
+        if type(Use_Sum) is bool:
+            df_in['USE_SUM'] = Use_Sum
+        elif type(Use_Sum) is int:
+            df_in['USE_SUM'] = Use_Sum==1
+        else:
+            print('Use sum should be either bool (True/False) or int (1/0), but type passed is {type(Use_Sum)}')
+            exit()
+    else:
+        df_in['USE_SUM'] = Use_Sum['USE_SUM']
 
-    df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
+    df_Format = pd.DataFrame(df_in.apply(formatBestChoiceOutput, nTC=tcPerLink[EPORTTX_NUMEN], axis=1).values,columns=['FullDataString'],index=df_in.index)
 
-    df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+    df_Format['FRAMEQ_NUMW'] = 2*EPORTTX_NUMEN if EPORTTX_NUMEN<13 else 25
+#    df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
 
+    df_Format['IdleWord'] = 0
+    # if type(TxSyncWord) is pd.DataFrame:
+    #     df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values
+    # else:
+    #     df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+        
     frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
     df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
@@ -483,7 +522,7 @@ binFormat=np.vectorize(binFormat)
 
 def format_AutoencoderOutput(row, Eporttx_Numen):
     ae_Bits = np.array(list(''.join(row[[f'AE_BYTE{i}' for i in range(19,-1,-1)]].apply(binFormat,N=8))))[7:]
-    ae_Mask = np.array(list(''.join(row[[f'MAE_BYTE{i}' for i in range(17,-1,-1)]].apply(binFormat,N=8))))=='1'
+    ae_Mask = np.array(list(''.join(row[[f'KAEB_BYTE{i}' for i in range(17,-1,-1)]].apply(binFormat,N=8))))=='1'
 
     modSum = ''.join(ae_Bits[-9:])
     ae_DataBits = ae_Bits[:-9]

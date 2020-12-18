@@ -54,7 +54,7 @@ def packIntoInputLinks(row):
     
     return LINK
 
-def processTree(_tree, geomDF, subdet, layer, geomVersion="v11", jobNumber=0, nEvents=-1, nStart=-1):
+def processTree(_tree, geomDF, subdet, layer, wafer=None, geomVersion="v11", jobNumber=0, nEvents=-1, nStart=-1):
 
     #load dataframe
     print('load dataframe')
@@ -76,6 +76,8 @@ def processTree(_tree, geomDF, subdet, layer, geomVersion="v11", jobNumber=0, nE
         df.columns = ['subdet','zside','layer','wafer','triggercell','uncompressedCharge','compressedCharge','data','mipPt','simenergy']
     df.reset_index('subentry',drop=True,inplace=True)
 
+    df['simenergyEvent'] = df.groupby('entry').simenergy.sum()
+
     #remove unwanted layers
     df = df[(df.subdet==subdet) & (df.layer==layer)]
 
@@ -83,6 +85,9 @@ def processTree(_tree, geomDF, subdet, layer, geomVersion="v11", jobNumber=0, nE
         df['wafer'] = 100*df.waferu + df.waferv
         df['UV'] = list(zip(df.triggercellu, df.triggercellv))
         df['triggercell'] = df.UV.map(triggerCellUVRemap)
+
+    if not wafer is None:
+        df = df[df.wafer.isin(wafer)]
 
     df = df.reset_index().merge(tc_remap,left_on='triggercell',right_on='TC_Number',how='left').set_index('entry')
 
@@ -142,7 +147,7 @@ def processTree(_tree, geomDF, subdet, layer, geomVersion="v11", jobNumber=0, nE
 
 
 
-def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jobInfo="",fileInfo=""):
+def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jobInfo="",fileInfo="",zeroSuppress=False):
     writeMode = 'w'
     header=True
     if appendFile:
@@ -157,13 +162,19 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
 
     encodedlist   = gb[['ECON_TC_Number_PreMux','encodedCharge']].apply(makeTCindexCols,'encodedCharge',-1,'ECON_TC_Number_PreMux')
 
-    simEnergy =gb[['simenergy']].sum()>0
-    simEnergy.columns=['SimEnergyPresent']
+    simEnergy =gb[['simenergy']].sum()
+    simEnergy[['eventSimEnergy']] =gb[['simenergyEvent']].mean()
+    simEnergy.columns=['SimEnergyTotal','EventSimEnergy']
 
     df_out     = pd.DataFrame(index=encodedlist.index)
     df_out[ENCODED_headers]= pd.DataFrame((encodedlist).values.tolist(),index=encodedlist.index)
 
     df_out.fillna(0,inplace=True)
+
+    # if zeroSuppress:
+    #     nonZeroModule = df_out.sum(axis=1)>0
+    #     print(df_out.sum(axis=1))
+    #     df_out = df_out.loc[nonZeroModule]
 
     df_out[EPORTRX_headers] = pd.DataFrame(df_out.apply(packIntoInputLinks,axis=1).tolist(),columns=EPORTRX_headers,index=encodedlist.index)
 
@@ -173,14 +184,14 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
             waferv = int(_wafer-100*waferu)
 
             if odir=='./':
-                waferDir = f'wafer_D{subdet}L{layer}U{waferu}V{waferv}/'
+                waferDir = f'wafer_D{subdet}L{layer}U{waferu}V{waferv}{jobInfo}/'
             else:
-                waferDir = f'{odir}/wafer_D{subdet}L{layer}U{waferu}V{waferv}/'
+                waferDir = f'{odir}/wafer_D{subdet}L{layer}U{waferu}V{waferv}{jobInfo}/'
         else:
             if odir=='./':
-                waferDir = f'wafer_D{subdet}L{layer}W{_wafer}/'
+                waferDir = f'wafer_D{subdet}L{layer}W{_wafer}{jobInfo}/'
             else:
-                waferDir = f'{odir}/wafer_D{subdet}L{layer}W{_wafer}/'
+                waferDir = f'{odir}/wafer_D{subdet}L{layer}W{_wafer}{jobInfo}/'
 
         if not os.path.exists(waferDir):
             os.makedirs(waferDir, exist_ok=True)
@@ -189,25 +200,33 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
         # df_out[F2F_headers]     = pd.DataFrame((f2flist.loc[subdet,layer,_wafer]).values.tolist(),index=f2flist.loc[subdet,layer,_wafer].index)
         # df_out[CALQ_headers]   = pd.DataFrame((calQlist.loc[subdet,layer,_wafer]).values.tolist(),index=calQlist.loc[subdet,layer,_wafer].index)
         # df_out.fillna(0,inplace=True)
-        
-        waferInput = pd.DataFrame(index=df.entry.unique(),columns=EPORTRX_headers)
-        waferInput.index.name='entry'
-        waferInput[EPORTRX_headers] = df_out.loc[_wafer][EPORTRX_headers]
 
-        waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna(0)
-        # waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna("0000000000000000000000000000")
-        waferInput.fillna(0,inplace=True)
+        if not os.path.exists(f"{waferDir}/EPORTRX_data.csv"):
+            writeMode='w'
+            header=True
+        else:
+            writeMode='a'
+            header=False
 
-        waferInput.astype(int).to_csv(f"{waferDir}/EPORTRX_data{jobInfo}.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
+        if not zeroSuppress:
+            waferInput = pd.DataFrame(index=df.entry.unique(),columns=EPORTRX_headers)
+            waferInput.index.name='entry'
+            waferInput[EPORTRX_headers] = df_out.loc[_wafer][EPORTRX_headers]
 
-        simEnergy.loc[_wafer].astype(int).to_csv(f"{waferDir}/SimEnergyStatus{jobInfo}.csv",columns=["SimEnergyPresent"],index='entry', mode=writeMode, header=header)
+#            waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna(0)
+            # waferInput[EPORTRX_headers] = waferInput[EPORTRX_headers].fillna("0000000000000000000000000000")
+        else:
+            waferInput = df_out.loc[_wafer][EPORTRX_headers]
+        waferInput.fillna(0,inplace=True)            
+        waferInput.astype(int).to_csv(f"{waferDir}/EPORTRX_data.csv",columns=EPORTRX_headers,index='entry', mode=writeMode, header=header)
+
+        simEnergy.loc[_wafer].to_csv(f"{waferDir}/SimEnergyTotal.csv",columns=["SimEnergyTotal","EventSimEnergy"],index='entry', mode=writeMode, header=header)
 
 
         isHDM = df[df.wafer==_wafer].head().isHDM.any()
 
-#        print(df.columns)
-
-        if not appendFile:
+        if not os.path.exists(f"{waferDir}/metaData.py"):
+            print("Making Metadata", waferDir)
             with open(f"{waferDir}/metaData.py",'w') as _metaDataFile:
                 _metaDataFile.write(f"subdet={subdet}\n")
                 _metaDataFile.write(f"layer={layer}\n")
@@ -215,9 +234,8 @@ def writeInputCSV(odir,df,subdet,layer,waferList,geomVersion,appendFile=False,jo
                 _metaDataFile.write(f"geomVersion='{geomVersion}'\n")
                 _metaDataFile.write(f"isHDM={isHDM}\n")
                 _metaDataFile.write(f'rootFile="{fileInfo}"')
-                
         
-def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, chunkSize=10000, geomVersion="v9", appendFile=False, jobInfo=""):
+def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, chunkSize=10000, geomVersion="v9", appendFile=False, jobInfo="", zeroSuppress=False):
 
     #load tree into uproot
     _tree = uproot.open(fName,xrootdsource=dict(chunkbytes=250*1024**2, limitbytes=250*1024**2))['hgcalTriggerNtuplizer/HGCalTriggerNtuple']
@@ -251,15 +269,22 @@ def processNtupleInputs(fName, geomDF, subdet, layer, wafer, odir, nEvents, chun
         _appendFile = appendFile or j>0
 
         print ('process tree')
-        Layer_df =   processTree(_tree,geomDF,subdet,layer,geomVersion,jobNumber,nEvents=min(nEventsTot, chunkSize), nStart=chunkSize*j)
+        Layer_df =   processTree(_tree,geomDF,subdet,layer,geomVersion=geomVersion,jobNumber=jobNumber,nEvents=min(nEventsTot, chunkSize), nStart=chunkSize*j)
 
-        waferList = Layer_df.wafer.unique()
+        waferListStart = Layer_df.wafer.unique()
 
-        if not wafer==-1:
-            waferList = [wafer]
+        waferList = []
+        if not wafer==[-1]:
+            for w in wafer:
+                if w in waferListStart:
+                    waferList.append(w)
+                else:
+                    print(f'Wafer {w} not present in data, skipping')
+        else:
+            waferList = waferListStart
         print ('Writing Inputs')
 
-        writeInputCSV(odir,  Layer_df, subdet,layer,waferList, geomVersion, _appendFile, jobInfo, fileInfo=fName)
+        writeInputCSV(odir,  Layer_df, subdet,layer,waferList, geomVersion, _appendFile, jobInfo, fileInfo=fName, zeroSuppress=zeroSuppress)
 
         del Layer_df
         gc.collect()
@@ -300,7 +325,7 @@ def main(opt,args):
     fileName = opt.inputFile
     fileNameContent = opt.inputFileFormat
     eosDir = opt.eosDir
-
+    print(fileName)
     if fileName is None:
         if fileNameContent is None:
             if geomVersion=='v10':
@@ -344,21 +369,38 @@ def main(opt,args):
             stopFileNum = int((jobNumber+1)*filesPerJob)
     if not opt.Nfiles==-1:
         stopFileNum = startFileNum + opt.Nfiles
+    if stopFileNum in [-1,len(fileList)]:
+        stopFileNum=None
     fileList = fileList[startFileNum:stopFileNum]
-
 
     if geomVersion in ['v10','v11']:
         geomDF = getGeomDF_V10()
     else:
         geomDF = getGeomDF_V9()
 
+    waferList = []
+    print('HERE')
+    print(fileList)
     for i,fName in enumerate(fileList):
         print(i, fName)
         wafer = opt.wafer
+        print(wafer)
+        if wafer is None:
+            wafer = []
+        if -1 in wafer:
+            wafer = [-1]
         if geomVersion in ['v10','v11']:
-            if not wafer==-1:
-                wafer = opt.waferu*100 + opt.waferv
-        waferList = processNtupleInputs(fName, geomDF, subdet, layer, wafer, opt.odir, opt.Nevents, opt.chunkSize, geomVersion=geomVersion, appendFile=i>0, jobInfo=jobSplitText)
+            if not wafer==[-1]:
+                for j in range(len(opt.waferu)):
+                    u = opt.waferu[j]
+                    v = opt.waferv[j]
+                    wafer.append(u*100 + v)
+        
+        print(wafer)
+        _waferList = processNtupleInputs(fName, geomDF, subdet, layer, wafer, opt.odir, opt.Nevents, opt.chunkSize, geomVersion=geomVersion, appendFile=i>0, jobInfo=jobSplitText, zeroSuppress=opt.zeroSuppress)
+
+        waferList = list(set(list(_waferList) + waferList))
+
     print(waferList)
 
 
@@ -371,18 +413,30 @@ if __name__=='__main__':
     # parser.add_option("--eosDir", type="string", default = '/store/user/dnoonan/HGCAL_Concentrator/L1THGCal_Ntuples/TTbar',dest="eosDir", help="direcot")
 
     parser.add_option('-o',"--odir", type="string", default = './',dest="odir", help="output directory")
-    parser.add_option('-w',"--wafer" , type=int, default = 31,dest="wafer" , help="which wafer to write")
-    parser.add_option('-u',"--waferu" , type=int, default = 4,dest="waferu" , help="which wafer to write")
-    parser.add_option('-v',"--waferv" , type=int, default = 2,dest="waferv" , help="which wafer to write")
+    parser.add_option('-w',"--wafer"  , type=int, action="append", dest="wafer"  , help="which wafer to write")
+    parser.add_option('-u',"--waferu" , type=int, action="append", dest="waferu" , help="which wafer to write")
+    parser.add_option('-v',"--waferv" , type=int, action="append", dest="waferv" , help="which wafer to write")
+    # parser.add_option('-w',"--wafer" , type=int, default = 31,dest="wafer" , help="which wafer to write")
+    # parser.add_option('-u',"--waferu" , type=int, default = 4,dest="waferu" , help="which wafer to write")
+    # parser.add_option('-v',"--waferv" , type=int, default = 2,dest="waferv" , help="which wafer to write")
     parser.add_option('-l',"--layer" , type=int, default = 5 ,dest="layer" , help="which layer to write")
     parser.add_option('-d',"--subdet", type=int, default = 3 ,dest="subdet", help="which subdet to write")
     parser.add_option('--Nfiles', type=int, default = 1 ,dest="Nfiles", help="Limit on number of files to read (-1 is all)")
     parser.add_option('--Nevents', type=int, default = -1 ,dest="Nevents", help="Limit on number of events to read per file (-1 is all)")
     parser.add_option('--chunkSize', type=int, default = 100000 ,dest="chunkSize", help="Number of events to load from root file in a single chunk")
     parser.add_option('--jobSplit', type="string", default = "1/1" ,dest="jobSplit", help="Split of the input root files")
+    parser.add_option('--zeroSuppress', default = False, action='store_true' ,dest="zeroSuppress", help="Drop lines which are all 0")
     parser.add_option("--v10", default = False, action='store_true',dest="useV10", help="use v10 geometry")
     parser.add_option("--v9", default = False, action='store_true',dest="useV9", help="use v9 geometry")
 
     (opt, args) = parser.parse_args()
+
+    if opt.wafer is None:
+        if opt.waferu is None or opt.waferv is None:
+            print('Need to specify at least one wafer to use')
+            exit()
+        if not len(opt.waferu)==len(opt.waferv):
+            print('Need to specify a u and v value for each wafer')
+            exit()
 
     main(opt,args)

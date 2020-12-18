@@ -28,9 +28,11 @@ def EPortRXTestBench(inputDir, outputDir):
     ]
 
     for fSrc, fDest in linkFiles:
-        if not os.path.exists(f'{outputDir}/{fDest}'):
+        try:
             os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
-    
+        except:
+            print (f'link exists for {fDest}, skipping')
+
     shutil.copy(f'{inputDir}/ORBSYN_CNT_LOAD_VAL.csv',f'{outputDir}/EPortRX_Input_ORBSYN_CNT_LOAD_VAL.csv')
     NewFiles.append('EPortRX_Input_ORBSYN_CNT_LOAD_VAL.csv')
     shutil.copy(f'{inputDir}/EPORTRX_data.csv',f'{outputDir}/EPortRX_Input_EPORTRX_data.csv')
@@ -47,9 +49,11 @@ def MuxFixCalibTestBench(inputDir, outputDir):
     ]
 
     for fSrc, fDest in linkFiles:
-        if not os.path.exists(f'{outputDir}/{fDest}'):
+        try:
             os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
-    
+        except:
+            print (f'link exists for {fDest}, skipping')
+
     #copy registers 
     shutil.copy(f'{inputDir}/HighDensity.csv', f'{outputDir}/MuxFixCalib_Input_HighDensity.csv')
     NewFiles.append('MuxFixCalib_Input_HighDensity.csv')
@@ -247,11 +251,11 @@ def FormatBuffer(inputDir, outputDir):
 
 
     #create dummy files for the auto encoder
-    dfAE = pd.DataFrame(dict({f'AE_BYTE{i}':0 for i in range(20)},**{f'MAE_BYTE{i}':0 for i in range(18)}), index=df.index)
+    dfAE = pd.DataFrame(dict({f'AE_BYTE{i}':0 for i in range(20)},**{f'KAEB_BYTE{i}':0 for i in range(18)}), index=df.index)
     dfAE[[f'AE_BYTE{i}' for i in range(20)]].to_csv(f'{outputDir}/Formatter_Buffer_Input_outEncoder.csv',index=saveIndex)
     NewFiles.append('Formatter_Buffer_Input_outEncoder.csv')
-    dfAE[[f'MAE_BYTE{i}' for i in range(18)]].to_csv(f'{outputDir}/Formatter_Buffer_Input_mask_auto_encoder.csv',index=saveIndex)
-    NewFiles.append('Formatter_Buffer_Input_mask_auto_encoder.csv')
+    dfAE[[f'KAEB_BYTE{i}' for i in range(18)]].to_csv(f'{outputDir}/Formatter_Buffer_Input_keep_auto_encoder_bits.csv',index=saveIndex)
+    NewFiles.append('Formatter_Buffer_Input_keep_auto_encoder_bits.csv')
 
 
     #update file contents to leave space after comma in csv
@@ -274,20 +278,23 @@ def FormatBuffer(inputDir, outputDir):
              ]
 
     for fSrc, fDest in linkFiles:
-        if not os.path.exists(f'{outputDir}/{fDest}'):
+        try:
             os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
+        except:
+            print (f'link exists for {fDest}, skipping')
 
-def makeVerificationData(inputDir, outputDir):
+def makeVerificationData(inputDir, outputDir, stopAtAlgoBlock=False):
 
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
 
     shutil.copy(f'{inputDir}/metaData.py',f'{outputDir}/metaData.py')
 
-    AlgoTestBench(inputDir, outputDir)
-    FormatBuffer(inputDir, outputDir)
-    MuxFixCalibTestBench(inputDir, outputDir)
     EPortRXTestBench(inputDir, outputDir)
+    MuxFixCalibTestBench(inputDir, outputDir)
+    if not stopAtAlgoBlock:
+        AlgoTestBench(inputDir, outputDir)
+        FormatBuffer(inputDir, outputDir)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()

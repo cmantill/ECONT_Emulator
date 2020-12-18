@@ -1,0 +1,26 @@
+universe = vanilla
+Executable = runSkim.sh
+
+should_transfer_files = YES
+WhenToTransferOutput  = ON_EXIT
+notification = never
+
+Transfer_Input_Files = skimToSimOnly.py
+
+Output = LogFiles/skim_ele_trainingData_$(cluster)_$(process).stdout
+Error  = LogFiles/skim_ele_trainingData_$(cluster)_$(process).stderr
+Log    = LogFiles/skim_ele_trainingData_$(cluster)_$(process).condor
+
++RequestMemory=6000
+
+# Arguments = ele0PU/PUAllocation/
+# Queue 1
+
+# Arguments = ele0PU/SignalAllocation/
+# Queue 1
+
+Arguments = ele200PU/PUAllocation/
+Queue 1
+
+Arguments = ele200PU/SignalAllocation/
+Queue 1

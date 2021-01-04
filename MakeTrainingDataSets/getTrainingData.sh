@@ -66,11 +66,9 @@ then
 
 fi
 
-
 # #get data from ntuples
 echo "python3 getDataFromMC.py -o ${dataType}_v11Geom_layer_${layer} -d $subdet -l $layer -w -1  --Nfiles -1 --Nevents -1 --eosDir ${eosInputDir} --inputFileFormat ${inputFileFormat} --jobSplit ${jobSplit}/${jobCount} --zeroSuppress --chunkSize ${chunkSize}"
-python3 getDataFromMC.py -o ${dataType}_v11Geom_layer_${layer} -d $subdet -l $layer -w -1  --Nfiles -1 --Nevents 100 --eosDir ${eosInputDir} --inputFileFormat ${inputFileFormat} --jobSplit ${jobSplit}/${jobCount} --zeroSuppress --chunkSize ${chunkSize}
-
+python3 getDataFromMC.py -o ${dataType}_v11Geom_layer_${layer} -d $subdet -l $layer -w -1  --Nfiles -1 --Nevents -1 --eosDir ${eosInputDir} --inputFileFormat ${inputFileFormat} --jobSplit ${jobSplit}/${jobCount} --zeroSuppress --chunkSize ${chunkSize}
 
 mkdir ${dataType}_TrainingData_PUAllocation
 mkdir ${dataType}_TrainingData_PUAllocation/nElinks_1
@@ -120,6 +118,10 @@ do
             python3 mixFile.py -i $csvF
             echo "xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/${f}"
             xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/${f}
+            python3 skimToSimOnly.py -i $csvF
+            if [[ $(wc -l <${csvF}) -ge 2 ]]; then
+                xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/Skim/${f}
+            fi
         done;
     fi
 done;
@@ -140,6 +142,10 @@ do
             python3 mixFile.py -i $csvF
             echo "xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/${f}"
             xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/${f}
+            python3 skimToSimOnly.py -i $csvF
+            if [[ $(wc -l <${csvF}) -ge 2 ]]; then
+                xrdcp -f ${csvF} root://cmseos.fnal.gov//store/user/dnoonan/AE_TrainingData/NewData/Skim/${f}
+            fi
         done;
     fi
 done;
@@ -154,6 +160,8 @@ else
     xrdcp -rf ${dataType}_v11Geom_layer_${layer}_job${jobSplit}.tgz root://cmseos.fnal.gov//store/user/lpchgcal/ECON_Verification_Data/v3
     rm ${dataType}_v11Geom_layer_${layer}_job${jobSplit}.tgz
     rm -rf ${dataType}_v11Geom_layer_${layer}
+    rm -rf ${dataType}_TrainingData_PUAllocation
+    rm -rf ${dataType}_TrainingData_SignalAllocation
     rm -rf hgcalPythonEnv
     rm *.tgz
     rm -rf Utils

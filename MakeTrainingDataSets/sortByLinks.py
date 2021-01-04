@@ -52,8 +52,7 @@ dfInput = dfInput[mask]
 indexList = dfInput.index.values.copy()
 np.random.shuffle(indexList)
 
-columns = ['entry','CALQ_0','CALQ_1','CALQ_2','CALQ_3','CALQ_4','CALQ_5','CALQ_6','CALQ_7','CALQ_8','CALQ_9','CALQ_10','CALQ_11','CALQ_12','CALQ_13','CALQ_14','CALQ_15','CALQ_16','CALQ_17','CALQ_18','CALQ_19','CALQ_20','CALQ_21','CALQ_22','CALQ_23','CALQ_24','CALQ_25','CALQ_26','CALQ_27','CALQ_28','CALQ_29','CALQ_30','CALQ_31','CALQ_32','CALQ_33','CALQ_34','CALQ_35','CALQ_36','CALQ_37','CALQ_38','CALQ_39','CALQ_40','CALQ_41','CALQ_42','CALQ_43','CALQ_44','CALQ_45','CALQ_46','CALQ_47','SimEnergyTotal','EventSimEnergy','SimEnergyFraction']
-
+columns = ['entry','CALQ_0','CALQ_1','CALQ_2','CALQ_3','CALQ_4','CALQ_5','CALQ_6','CALQ_7','CALQ_8','CALQ_9','CALQ_10','CALQ_11','CALQ_12','CALQ_13','CALQ_14','CALQ_15','CALQ_16','CALQ_17','CALQ_18','CALQ_19','CALQ_20','CALQ_21','CALQ_22','CALQ_23','CALQ_24','CALQ_25','CALQ_26','CALQ_27','CALQ_28','CALQ_29','CALQ_30','CALQ_31','CALQ_32','CALQ_33','CALQ_34','CALQ_35','CALQ_36','CALQ_37','CALQ_38','CALQ_39','CALQ_40','CALQ_41','CALQ_42','CALQ_43','CALQ_44','CALQ_45','CALQ_46','CALQ_47','SimEnergyTotal','EventSimEnergy','SimEnergyFraction','subdet','layer','waferu','waferv','HD_LD','ModType']
 
 if linkPUAllocation>0:
 

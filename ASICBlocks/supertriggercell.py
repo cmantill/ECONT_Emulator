@@ -28,7 +28,7 @@ def supertriggercell_2x2(row):
     stc_Charges = chargeQ[stcMap]
 
     stc_sum=stc_Charges.sum(axis=1)
-    stc_idx=stc_Charges.argmax(axis=1)
+    stc_idx = stc_Charges.shape[1] - 1 - np.flip(stc_Charges,axis=1).argmax(axis=1)
 
     return np.append(stc_sum,stc_idx)
 
@@ -41,7 +41,7 @@ def supertriggercell_4x4(row):
     stc_Charges = chargeQ[stcMap]
 
     stc_sum=stc_Charges.sum(axis=1)
-    stc_idx=stc_Charges.argmax(axis=1)
+    stc_idx = stc_Charges.shape[1] - 1 - np.flip(stc_Charges,axis=1).argmax(axis=1)
 
     return np.append(stc_sum,stc_idx)
 

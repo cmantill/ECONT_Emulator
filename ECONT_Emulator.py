@@ -1,4 +1,3 @@
-import uproot
 import argparse
 import os
 
@@ -105,8 +104,8 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     pd.DataFrame([[STC_TYPE]], columns=['STC_TYPE'],index=df_CALQ.index).to_csv(f'{outputDir}/STC_TYPE.csv', index=saveIndex)
     pd.DataFrame([[Use_Sum]], columns=['USE_SUM'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=saveIndex)
 
-    BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*12*2
-    BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*12*2-24
+    BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*13*2
+    BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*13*2-24
     BUFFER_THRESHOLD_T3 = 25
 
     pd.DataFrame([[int(BUFFER_THRESHOLD_T1)]], columns=['BUFFER_THRESHOLD_T1'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T1.csv', index=saveIndex)

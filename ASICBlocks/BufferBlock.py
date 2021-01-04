@@ -25,14 +25,14 @@ def Buffer(df_formatterOutput, EPORTTX_NUMEN, T1 , T2, T3):
         if (Nbuf + NBXc) > T1:
             truncated = True
             ### explicitly set eighth bit to 0
-            truncatedData[0] = truncatedData[0] & ~(1<<8)
+            truncatedData[0] = truncatedData[0] | (1<<8)
 
             BufferContents[writePointer:writePointer+2] = truncatedData
             cond1 = True
         elif ((Nbuf + NBXc) <= T1) and (Nbuf > T2) and (NBXc <= T3):
             truncated = True
             ### explicitly set eighth bit to 1
-            truncatedData[0] = truncatedData[0] | (1<<8)
+            truncatedData[0] = truncatedData[0] & ~(1<<8)
 
             BufferContents[writePointer:writePointer+2] = truncatedData
             cond2 = True
@@ -66,8 +66,27 @@ def Buffer(df_formatterOutput, EPORTTX_NUMEN, T1 , T2, T3):
         
         totalData.append(outputData)
 
+    while writePointer > 0:
+        words = BufferContents[:2*EPORTTX_NUMEN]
+        
+        #outputData = ((words[::2]<<16) + words[1::2]).tolist()
+		# This change makes it slightly harder to read the output words in
+		# order, but it correctly matches the 32-bit words we get out of the
+		# hardware.  The first 16-bit word goes into the LSB of a 32-bit output
+		# word, and the second 16-bit word goes into the MSB of the 32-bit
+		# output word.
+        outputData = ((words[1::2]<<16) + words[0::2]).tolist()
+        BufferContents[0:400-2*EPORTTX_NUMEN] = BufferContents[2*EPORTTX_NUMEN:400]
+        writePointer = max(writePointer-2*EPORTTX_NUMEN, 0)
+
+        outputData += [0]*(MAX_EPORTTX-EPORTTX_NUMEN)
+        outputData += [truncated, Nbuf, NBXc, cond1, cond2, cond3, cond4]
+        
+        totalData.append(outputData)
+
     txDataColumns = [f'TX_DATA_{i}' for i in range(MAX_EPORTTX)]
     statusColumns = ['Truncated', 'Nbuf', 'NBXc', 'Cond1', 'Cond2','Cond3','Cond4']
-    df_BufferOutput = pd.DataFrame(data = np.array(totalData), columns=txDataColumns + statusColumns, index=df_formatterOutput.index)
+    #df_BufferOutput = pd.DataFrame(data = np.array(totalData), columns=txDataColumns + statusColumns, index=df_formatterOutput.index)
+    df_BufferOutput = pd.DataFrame(data = np.array(totalData), columns=txDataColumns + statusColumns)
 
     return df_BufferOutput

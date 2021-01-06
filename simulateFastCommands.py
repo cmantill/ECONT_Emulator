@@ -77,7 +77,7 @@ def produceRandomFastCommandsAndOffsets(fastCommandPercent, N):
 
     return offsetChanges, fastCommands
 
-def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommands=-1, N=-1, ORBSYN_CNT_LOAD_VAL=0, makeOffsetChange=False, STARTUP_OFFSET_ORBITS=0, STARTUP_OFFSET_BUCKETS=0, randomSampling=False):
+def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommands=-1, N=-1, ORBSYN_CNT_LOAD_VAL=0, makeOffsetChange=False, STARTUP_OFFSET_ORBITS=0, STARTUP_OFFSET_BUCKETS=0, randomSampling=False, synchHeader=9, regularHeader=10):
 
     inputFile=f'{inputDir}/EPORTRX_data.csv'
     outputFile=f'{outputDir}/EPORTRX_data.csv'
@@ -240,11 +240,12 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
 
 
     # set header, with BX counter after the fast commands
+    synchHeader = int(synchHeader,16)
+    regularHeader = int(regularHeader,16)
+    header = np.zeros(N,dtype=int) + regularHeader
+    header[globalBXCounter==0] = synchHeader
 
-    header = np.zeros(N,dtype=int) + 10
-    header[globalBXCounter==0] = 9
-
-    eportRXData.loc[header==9,'DATA_SYNCH'] = 'SYNCH'
+    eportRXData.loc[header==synchHeader,'DATA_SYNCH'] = 'SYNCH'
 
     for c in dataCols:
         eportRXData[c] = eportRXData[c] + (header<<28)
@@ -313,7 +314,9 @@ if __name__=='__main__':
     parser.add_argument('-L', type=int, default = -1,dest="NLinks", help="Number of ePortTX links to use, -1 is all in input (default: -1)")
     parser.add_argument('--GodOrbitOffset', type=int, default = 1, dest="GodOrbitOffset", help="Offset in GodOrbit number caused by the startup (default 1)")
     parser.add_argument('--GodBucketOffset', type=int, default = 660, dest="GodBucketOffset", help="Offset in GodBucket number caused by the startup (default 660)")
-    parser.add_argument('--counterReset', type=int, default = 3513,dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 3513)")
+    parser.add_argument('--counterReset', type=int, default = 3513, dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 3513)")
+    parser.add_argument('--synchHeader', default = '9', dest="synchHeader", help="Value of header to be used at BC0 (default=9)")
+    parser.add_argument('--regularHeader', default = '10', dest="regularHeader", help="Value of header to be everywhere other than BC0 (default=10)")
 
     args = parser.parse_args()
 
@@ -336,7 +339,9 @@ if __name__=='__main__':
                                                           makeOffsetChange=True,
                                                           STARTUP_OFFSET_ORBITS = args.GodOrbitOffset,
                                                           STARTUP_OFFSET_BUCKETS = args.GodBucketOffset,
-                                                          randomSampling=args.RandomSampling)
+                                                          randomSampling=args.RandomSampling,
+                                                          synchHeader=args.synchHeader,
+                                                          regularHeader=args.regularHeader)
 
     runEmulator(tempOutputDir, ePortTx=args.NLinks, StopAtAlgoBlock=args.StopAtAlgoBlock)
 

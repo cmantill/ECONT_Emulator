@@ -68,10 +68,10 @@ def loadEportRXData(_inputDir, simEnergy=False):
 def splitEportRXData(df_ePortRxDataGroup):
     Mux_in_headers = np.array([f'Mux_in_{i}' for i in range(48)])
     
-    x0 = (df_ePortRxDataGroup.values>>21) & 127
-    x1 = (df_ePortRxDataGroup.values>>14) & 127
-    x2 = (df_ePortRxDataGroup.values>>7) & 127
-    x3 = (df_ePortRxDataGroup.values) & 127
+    x3 = (df_ePortRxDataGroup.values>>21) & 127
+    x2 = (df_ePortRxDataGroup.values>>14) & 127
+    x1 = (df_ePortRxDataGroup.values>>7) & 127
+    x0 = (df_ePortRxDataGroup.values) & 127
 
     df_Mux_in = pd.DataFrame(x0,columns=Mux_in_headers[::4],index=df_ePortRxDataGroup.index)
     df_Mux_in[Mux_in_headers[1::4]] = pd.DataFrame(x1,columns=Mux_in_headers[1::4],index=df_ePortRxDataGroup.index)

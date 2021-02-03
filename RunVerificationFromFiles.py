@@ -94,6 +94,8 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False, algo=None):
         STC_Type = getRegister(f'{inputDir}/Formatter_Buffer_Input_STC_Type.csv')
         TxSyncWord = getRegister(f'{inputDir}/Formatter_Buffer_Input_TxSyncWord.csv')
 
+        df_LinkReset = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_link_reset_econt.csv',skipinitialspace=True)
+        df_LinkReset.columns=['LINKRESETECONT']
         if algo==0: #threshold sum
 
             latency=1
@@ -109,7 +111,7 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False, algo=None):
             
             df_Threshold_Sum = df_AddrMap.merge(df_ChargeQ, left_index=True, right_index=True).merge(df_Sum, left_index=True, right_index=True).merge(df_SumNotTransmitted, left_index=True, right_index=True)
 
-            df_Emulator = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum).drop('IdleWord',axis=1)
+            df_Emulator = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum, EPortTx_NumEn, df_LinkReset).drop('IdleWord',axis=1)
 
         elif algo==1: #STC
             latency=1
@@ -122,7 +124,7 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False, algo=None):
             
             df_STC = df_XTC4_9.merge(df_XTC16_9, left_index=True, right_index=True).merge(df_XTC4_7, left_index=True, right_index=True).merge(df_MAX4_Addr, left_index=True, right_index=True).merge(df_MAX16_Addr, left_index=True, right_index=True)
 
-            df_Emulator = Format_SuperTriggerCell(df_STC, STC_Type, EPortTx_NumEn, df_BX_CNT, TxSyncWord).drop('IdleWord',axis=1)
+            df_Emulator = Format_SuperTriggerCell(df_STC, STC_Type, EPortTx_NumEn, df_BX_CNT, TxSyncWord, df_LinkReset).drop('IdleWord',axis=1)
 
         elif algo==2: #BC
             latency=1
@@ -133,14 +135,14 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False, algo=None):
             Use_Sum = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_Use_Sum.csv',skipinitialspace=True)
             Use_Sum.columns=['USE_SUM']
 
-            df_Emulator = Format_BestChoice(df_BestChoice,EPortTx_NumEn, df_BX_CNT, TxSyncWord, Use_Sum).drop('IdleWord',axis=1)
+            df_Emulator = Format_BestChoice(df_BestChoice,EPortTx_NumEn, df_BX_CNT, TxSyncWord, Use_Sum, df_LinkReset).drop('IdleWord',axis=1)
 
         elif algo==3: #RPT
             latency=1
 
             df_Repeater = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_RepeaterQ.csv',skipinitialspace=True)
 
-            df_Emulator = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord).drop('IdleWord',axis=1)
+            df_Emulator = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord, EPortTx_NumEn, df_LinkReset).drop('IdleWord',axis=1)
 
         elif algo==4: #AE
             latency=1
@@ -150,7 +152,7 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False, algo=None):
 
             df_Autoencoder = df_AEBytes.merge(df_AEMask, left_index=True, right_index=True)
 
-            df_Emulator = Format_Autoencoder(df_Autoencoder, df_BX_CNT, EPortTx_NumEn, TxSyncWord).drop('IdleWord',axis=1)
+            df_Emulator = Format_Autoencoder(df_Autoencoder, df_BX_CNT, EPortTx_NumEn, TxSyncWord, df_LinkReset).drop('IdleWord',axis=1)
 
         ### load expected outputs for comparisons
         df_FRAMEQ = pd.read_csv(f'{inputDir}/Formatter_Buffer_Output_FrameQ.csv', skipinitialspace=True)
@@ -187,7 +189,88 @@ def runVerification(inputDir, outputDir, ASICBlock, verbose=False, algo=None):
         df_Comparison.columns = [f'TX_DATA_{i}' for i in range(13)]
 
     elif ASICBlock=="FormatterBuffer":
-        print()
+        print('HERETEST')
+
+        df_BX_CNT = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_Bx_Cnt_In.csv',skipinitialspace=True)
+        df_BX_CNT.columns = ['BX_CNT']
+
+        algo = getRegister(f'{inputDir}/Formatter_Buffer_Input_Algorithm_Type.csv')
+        EPortTx_NumEn = getRegister(f'{inputDir}/Formatter_Buffer_Input_EPortTx_NumEn.csv')
+        STC_Type = getRegister(f'{inputDir}/Formatter_Buffer_Input_STC_Type.csv')
+        TxSyncWord = getRegister(f'{inputDir}/Formatter_Buffer_Input_TxSyncWord.csv')
+
+        df_LinkReset = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_link_reset_econt.csv',skipinitialspace=True)
+        df_LinkReset.columns=['LINKRESETECONT']
+
+        if algo==0: #threshold sum
+
+            latency=2
+
+            df_AddrMap = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_AddrMap.csv',skipinitialspace=True)
+            df_ChargeQ = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_ChargeQ.csv',skipinitialspace=True)
+            df_Sum = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_Sum.csv',skipinitialspace=True)
+            df_SumNotTransmitted = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_SumNotTransmitted.csv',skipinitialspace=True)
+            df_SumNotTransmitted.columns=['SUM_NOT_TRANSMITTED']
+
+            Use_Sum = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_Use_Sum.csv',skipinitialspace=True)
+            Use_Sum.columns=['USE_SUM']
+            
+            df_Threshold_Sum = df_AddrMap.merge(df_ChargeQ, left_index=True, right_index=True).merge(df_Sum, left_index=True, right_index=True).merge(df_SumNotTransmitted, left_index=True, right_index=True)
+
+            df_Emulator = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum, EPortTx_NumEn, df_LinkReset).drop('IdleWord',axis=1)
+
+        elif algo==1: #STC
+            latency=2
+
+            df_XTC16_9 = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_XTC16_9_Sum.csv',skipinitialspace=True)
+            df_XTC4_7 = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_XTC4_7_Sum.csv',skipinitialspace=True)
+            df_XTC4_9 = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_XTC4_9_Sum.csv',skipinitialspace=True)
+            df_MAX16_Addr = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_MAX16_Addr.csv',skipinitialspace=True)
+            df_MAX4_Addr = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_MAX4_Addr.csv',skipinitialspace=True)
+            
+            df_STC = df_XTC4_9.merge(df_XTC16_9, left_index=True, right_index=True).merge(df_XTC4_7, left_index=True, right_index=True).merge(df_MAX4_Addr, left_index=True, right_index=True).merge(df_MAX16_Addr, left_index=True, right_index=True)
+
+            df_Emulator = Format_SuperTriggerCell(df_STC, STC_Type, EPortTx_NumEn, df_BX_CNT, TxSyncWord, df_LinkReset).drop('IdleWord',axis=1)
+
+        elif algo==2: #BC
+            latency=4
+            df_BC_Charge = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_BC_Charge.csv',skipinitialspace=True)
+            df_BC_TC_map = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_BC_TC_map.csv',skipinitialspace=True)
+            df_BestChoice = df_BC_Charge.merge(df_BC_TC_map, left_index=True, right_index=True)
+
+            Use_Sum = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_Use_Sum.csv',skipinitialspace=True)
+            Use_Sum.columns=['USE_SUM']
+
+            df_Emulator = Format_BestChoice(df_BestChoice,EPortTx_NumEn, df_BX_CNT, TxSyncWord, Use_Sum, df_LinkReset).drop('IdleWord',axis=1)
+
+        elif algo==3: #RPT
+            latency=2
+
+            df_Repeater = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_RepeaterQ.csv',skipinitialspace=True)
+
+            df_Emulator = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord, EPortTx_NumEn, df_LinkReset).drop('IdleWord',axis=1)
+
+        elif algo==4: #AE
+            latency=2
+            
+            df_AEBytes = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_outEncoder.csv',skipinitialspace=True)
+            df_AEMask = pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_keep_auto_encoder_bits.csv',skipinitialspace=True)
+
+            df_Autoencoder = df_AEBytes.merge(df_AEMask, left_index=True, right_index=True)
+
+            df_Emulator = Format_Autoencoder(df_Autoencoder, df_BX_CNT, EPortTx_NumEn, TxSyncWord, df_LinkReset).drop('IdleWord',axis=1)
+
+        T1 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T1.csv')
+        T2 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T2.csv')
+        T3 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T3.csv')
+        EPortTx_NumEn = getRegister(f'{inputDir}/Formatter_Buffer_Input_EPortTx_NumEn.csv')
+
+        df_Emulator = Buffer(df_Emulator, EPortTx_NumEn, T1, T2, T3, df_LinkReset)
+
+        df_Comparison = pd.read_csv(f'{inputDir}/Formatter_Buffer_Output_buffer_ePortTx_DataIn.csv',skipinitialspace=True)[[f'BUF_OUT_TX_DATA_{i}' for i in range(13)]]
+
+        df_Comparison.columns = [f'TX_DATA_{i}' for i in range(13)]
+
     else:
         print('Unknown block to test', ASICBlock)
         exit()

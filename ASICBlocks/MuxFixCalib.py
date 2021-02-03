@@ -8,6 +8,8 @@ import pickle
 
 def getMuxRegisters(tpgNtupleMapping=False, MuxRegisters=None):
     if not MuxRegisters is None:
+        if 'passThrough' in MuxRegisters:
+            return np.arange(48)
         if '.csv' in MuxRegisters:
             mux = pd.read_csv(MuxRegisters)
             return mux.values[0]
@@ -74,6 +76,8 @@ def getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion, tpgNtu
         remappedThreshVal[x[1]] = threshVal[x[0]]
 
     if not CalRegisters is None:
+        if 'passThrough' in CalRegisters:
+            remappedCalibVal = np.array([1<<11]*48,dtype=int)
         if '.csv' in CalRegisters:
             calV = pd.read_csv(CalRegisters)
             remappedCalibVal = calV.values[0]

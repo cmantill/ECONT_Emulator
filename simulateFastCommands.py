@@ -87,6 +87,7 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
 
     try:
         eportRXData = pd.read_csv(inputFile,skipinitialspace=True)
+        eportRXData = eportRXData[[f'ePortRxDataGroup_{i}' for i in range(12)]] & 268435455
     except:
         print (f'Problem loading {inputFile}, trying EPortRX_Input_EPORTRX_data.csv')
         try:
@@ -315,8 +316,9 @@ if __name__=='__main__':
     parser.add_argument('--GodOrbitOffset', type=int, default = 1, dest="GodOrbitOffset", help="Offset in GodOrbit number caused by the startup (default 1)")
     parser.add_argument('--GodBucketOffset', type=int, default = 660, dest="GodBucketOffset", help="Offset in GodBucket number caused by the startup (default 660)")
     parser.add_argument('--counterReset', type=int, default = 3513, dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 3513)")
+    parser.add_argument('--hdmFlag', default = None, dest="hdmFlag", choices=[None,'0','1','True','False'], help="Specify whether HDM or not (default None, means read from metaData.py")
     parser.add_argument('--synchHeader', default = '9', dest="synchHeader", help="Value of header to be used at BC0 (default=9)")
-    parser.add_argument('--regularHeader', default = '10', dest="regularHeader", help="Value of header to be everywhere other than BC0 (default=10)")
+    parser.add_argument('--regularHeader', default = 'A', dest="regularHeader", help="Value of header to be everywhere other than BC0 (default=A)")
 
     args = parser.parse_args()
 
@@ -336,16 +338,16 @@ if __name__=='__main__':
                                                           randomFastCommands = args.randomFastCommands,
                                                           N = args.N,
                                                           ORBSYN_CNT_LOAD_VAL=args.ORBSYN_CNT_LOAD_VAL,
-                                                          makeOffsetChange=True,
+                                                          makeOffsetChange=False,
                                                           STARTUP_OFFSET_ORBITS = args.GodOrbitOffset,
                                                           STARTUP_OFFSET_BUCKETS = args.GodBucketOffset,
                                                           randomSampling=args.RandomSampling,
                                                           synchHeader=args.synchHeader,
                                                           regularHeader=args.regularHeader)
 
-    runEmulator(tempOutputDir, ePortTx=args.NLinks, StopAtAlgoBlock=args.StopAtAlgoBlock)
+    runEmulator(tempOutputDir, ePortTx=args.NLinks, StopAtAlgoBlock=args.StopAtAlgoBlock, MuxRegisters='passThrough', CalRegisters='passThrough', HDMFlag=args.hdmFlag)
 
     makeVerificationData(tempOutputDir, args.outputDir, stopAtAlgoBlock=args.StopAtAlgoBlock)
 
-    shutil.rmtree(tempOutputDir)
+#    shutil.rmtree(tempOutputDir)
     

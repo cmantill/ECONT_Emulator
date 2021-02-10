@@ -37,6 +37,8 @@ def EPortRXTestBench(inputDir, outputDir):
     NewFiles.append('EPortRX_Input_ORBSYN_CNT_LOAD_VAL.csv')
     shutil.copy(f'{inputDir}/EPORTRX_data.csv',f'{outputDir}/EPortRX_Input_EPORTRX_data.csv')
     NewFiles.append('EPortRX_Input_EPORTRX_data.csv')
+    shutil.copy(f'{inputDir}/BX_CNT.csv',f'{outputDir}/EPortRX_Output_BX_CNT.csv')
+    NewFiles.append('EPortRX_Output_BX_CNT.csv')
     
     #update file contents to leave space after comma in csv
     addSpaceToCSV(outputDir, NewFiles)
@@ -44,15 +46,8 @@ def EPortRXTestBench(inputDir, outputDir):
 def MuxFixCalibTestBench(inputDir, outputDir):
     NewFiles = []
 
-    #link algorithm outputs to formatter inputs
-    linkFiles = [['Algorithm_Input_CalQ.csv', 'MuxFixCalib_Output_CALQ.csv'],    
-    ]
-
-    for fSrc, fDest in linkFiles:
-        try:
-            os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
-        except:
-            print (f'link exists for {fDest}, skipping')
+    shutil.copy(f'{inputDir}/CALQ.csv',f'{outputDir}/MuxFixCalib_Output_CALQ.csv')
+    NewFiles.append('MuxFixCalib_Output_CALQ.csv')
 
     #copy registers 
     shutil.copy(f'{inputDir}/HighDensity.csv', f'{outputDir}/MuxFixCalib_Input_HighDensity.csv')
@@ -79,9 +74,17 @@ def MuxFixCalibTestBench(inputDir, outputDir):
 def AlgoTestBench(inputDir, outputDir):
     NewFiles = []
 
+    #link algorithm outputs to formatter inputs
+    linkFiles = [['MuxFixCalib_Output_CALQ.csv','Algorithm_Input_CalQ.csv'],    
+    ]
+
+    for fSrc, fDest in linkFiles:
+        try:
+            os.symlink(f'{fSrc}',f'{outputDir}/{fDest}')
+        except:
+            print (f'link exists for {fDest}, skipping')
+
     #Copy CALQ, HighDensity, and THRESHV
-    shutil.copy(f'{inputDir}/CALQ.csv',f'{outputDir}/Algorithm_Input_CalQ.csv')
-    NewFiles.append('Algorithm_Input_CalQ.csv')
     # shutil.copy(f'{inputDir}/HighDensity.csv', f'{outputDir}/Algorithm_Input_HighDensity.csv')
     # NewFiles.append('Algorithm_Input_HighDensity.csv')
     shutil.copy(f'{inputDir}/THRESHV.csv', f'{outputDir}/Algorithm_Input_Threshold.csv')

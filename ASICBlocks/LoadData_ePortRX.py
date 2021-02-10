@@ -12,11 +12,11 @@ def loadMetaData(_inputDir):
     return subdet, layer, wafer, isHDM, geomVersion
 
 
-def loadEportRXData(_inputDir, simEnergy=False):
+def loadEportRXData(_inputDir, simEnergy=False, alignmentTime=324):
     df = None
-    for fileName in ['EPORTRX_data','EPORTRX_output']:
+    for fileName in ['EPORTRX_data','EPORTRX_output','EPortRX_Input_EPORTRX_data']:
         try:
-            df = pd.read_csv(f"{_inputDir}/{fileName}.csv")
+            df = pd.read_csv(f"{_inputDir}/{fileName}.csv", skipinitialspace=True)
             break
         except:
             continue
@@ -34,6 +34,9 @@ def loadEportRXData(_inputDir, simEnergy=False):
     if not 'Orbit' in df.columns:
         df['Orbit'] = (np.arange(len(df))/3564).astype(int)
         df['BX'] = np.arange(len(df),dtype=int)%3564
+    if 'GOD_ORBIT_NUMBER' in df.columns:
+        df['Orbit'] = df.GOD_ORBIT_NUMBER
+        df['BX'] = df.GOD_BUCKET_NUMBER
 
     columns = [f'ePortRxDataGroup_{i}' for i in range(12)]
 
@@ -53,6 +56,13 @@ def loadEportRXData(_inputDir, simEnergy=False):
         headers = BX % 16
         headers[BX==0] = 31
 
+    df[columns] = df[columns].values & (2**28 - 1)
+
+    if 'FASTCMD' in df.columns:
+        resets = np.where(df.FASTCMD.values=='FASTCMD_LINKRESETROCT')[0]
+        for reset_bx in resets:
+            df.loc[reset_bx:reset_bx+alignmentTime,columns] = 0
+        
     
     df.set_index(['Orbit','BX'], inplace=True)
 

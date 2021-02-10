@@ -21,11 +21,15 @@ from ASICBlocks.Formatter import Format_Threshold_Sum, Format_BestChoice, Format
 from ASICBlocks.BufferBlock import Buffer
 
 
-def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False, MuxRegisters=None, CalRegisters=None, ThresholdRegisters=None):
+def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False, MuxRegisters=None, CalRegisters=None, HDMFlag=None, ThresholdRegisters=None):
     if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
     df_ePortRxDataGroup, df_BX_CNT, df_SimEnergyStatus = loadEportRXData(inputDir,SimEnergyFlag)
 
+    if not HDMFlag is None:
+        isHDM=False
+        if HDMFlag in ['1',1,'True',True]:
+            isHDM=True
     if outputDir is None:
         outputDir = inputDir
 
@@ -130,7 +134,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     del df_CALQ
 
     print('Formatter/Buffer Threshold-Sum')
-    df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum)
+    df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum, EPORTTX_NUMEN, df_linkReset)
     df_BufferOutput_TS  = Buffer(df_Format_TS,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Threshold_Sum
     df_Format_TS.to_csv(f'{outputDir}/Format_TS.csv',index=saveIndex)
@@ -139,7 +143,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     del df_BufferOutput_TS
 
     print('Formatter/Buffer Best Choice')
-    df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum)
+    df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum, df_linkReset)
     df_BufferOutput_BC  = Buffer(df_Format_BC,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_BestChoice
     df_Format_BC.to_csv(f'{outputDir}/Format_BC.csv',index=saveIndex)
@@ -148,7 +152,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     del df_BufferOutput_BC
 
     print('Formatter/Buffer STC')
-    df_Format_STC = Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord)
+    df_Format_STC = Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, df_linkReset)
     df_BufferOutput_STC = Buffer(df_Format_STC, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_SuperTriggerCell
     df_Format_STC.to_csv(f'{outputDir}/Format_STC.csv',index=saveIndex)
@@ -157,7 +161,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     del df_BufferOutput_STC
 
     print('Formatter/Buffer Repeater')
-    df_Format_RPT = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord)    
+    df_Format_RPT = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord, EPORTTX_NUMEN, df_linkReset)
     df_BufferOutput_RPT = Buffer(df_Format_RPT, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Repeater
     df_Format_RPT.to_csv(f'{outputDir}/Format_RPT.csv',index=saveIndex)

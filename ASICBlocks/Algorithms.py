@@ -16,7 +16,7 @@ def makeCHARGEQ(row, nDropBit=1):
 
     nDropBit = row['DropLSB']
 
-    raw_charges     = np.array(CALQ[CALQ>0]).astype(int)
+    raw_charges     = np.array(CALQ[CALQ>=0]).astype(int)
     if len(raw_charges)>0:
         encoded_charges = encodeV(raw_charges,nDropBit,nExp,nMant,roundBits,asInt=True)
     else:
@@ -36,8 +36,8 @@ def ThresholdSum(df_CALQ, THRESHV_Registers, DropLSB):
     df_Threshold_Sum = (df_CALQ>=thresholds).astype(int)
     df_Threshold_Sum.columns = ADD_MAP_Headers
 
-
-    df_in = (df_CALQ>=thresholds).astype(int)*df_CALQ
+    # temporary solution, put charges of < threshold to negative value, to be sorted out in makeCHARGEQ
+    df_in = ((df_CALQ>=thresholds).astype(int)*2 - 1 )*df_CALQ
     df_in['DropLSB'] = DropLSB
 
     qlist = df_in.apply(makeCHARGEQ,axis=1)

@@ -24,7 +24,7 @@ from ASICBlocks.BufferBlock import Buffer
 def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False, MuxRegisters=None, CalRegisters=None, HDMFlag=None, ThresholdRegisters=None):
     if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
-    df_ePortRxDataGroup, df_BX_CNT, df_SimEnergyStatus = loadEportRXData(inputDir,SimEnergyFlag)
+    df_ePortRxDataGroup, df_BX_CNT, df_SimEnergyStatus, df_linkReset = loadEportRXData(inputDir,SimEnergyFlag)
 
     if not HDMFlag is None:
         isHDM=False
@@ -96,6 +96,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
             print('Using EPORTTX_NUMEN=4')
             EPORTTX_NUMEN=4
 
+    print(f'Using EPORTTX_NUMEN={EPORTTX_NUMEN}')
     if STC_Type==-1:
         STC_TYPE=0 if isHDM else 1
     else:
@@ -126,10 +127,10 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     df_SuperTriggerCell.to_csv(f'{outputDir}/SuperTriggerCell.csv',index=saveIndex)
     df_Repeater.to_csv(f'{outputDir}/Repeater.csv',index=saveIndex)
 
-    try:
-        df_linkReset = pd.read_csv(f'{inputDir}/LinkResetEconT.csv')
-    except:
-        df_linkReset = pd.DataFrame({'LINKRESETECONT':0},index=df_CALQ.index)
+    # try:
+    #     df_linkReset = pd.read_csv(f'{inputDir}/LinkResetEconT.csv')
+    # except:
+    #     df_linkReset = pd.DataFrame({'LINKRESETECONT':0},index=df_CALQ.index)
 
     del df_CALQ
 

@@ -58,8 +58,12 @@ def loadEportRXData(_inputDir, simEnergy=False, alignmentTime=324):
 
     df[columns] = df[columns].values & (2**28 - 1)
 
+    df_linkResets = pd.DataFrame({'LINKRESETECONT':0,'LINKRESETROCT':0},index=df.index)
+
     if 'FASTCMD' in df.columns:
-        resets = np.where(df.FASTCMD.values=='FASTCMD_LINKRESETROCT')[0]
+        df_linkResets.loc[df.FASTCMD=='FASTCMD_LINKRESETROCT','LINKRESETROCT'] = 1
+        df_linkResets.loc[df.FASTCMD=='FASTCMD_LINKRESETECONT','LINKRESETECONT'] = 1
+        resets = np.where(df.FASTCMD.values=='FASTCMD_LINKRESETROCT')[0]        
         for reset_bx in resets:
             df.loc[reset_bx:reset_bx+alignmentTime,columns] = 0
         
@@ -73,7 +77,7 @@ def loadEportRXData(_inputDir, simEnergy=False, alignmentTime=324):
             df_SimEnergyStatus = df[['SimEnergyTotal','EventSimEnergy','entry']]
         else:
             df_SimEnergyStatus = df[['SimEnergyTotal','entry']]
-    return df[columns], df_BX_CNT, df_SimEnergyStatus
+    return df[columns], df_BX_CNT, df_SimEnergyStatus, df_linkResets
 
 def splitEportRXData(df_ePortRxDataGroup):
     Mux_in_headers = np.array([f'Mux_in_{i}' for i in range(48)])

@@ -312,13 +312,17 @@ if __name__=='__main__':
     parser.add_argument('--random', default = False,dest="RandomSampling", action='store_true', help="Use random sampling of input data to increase statistics")
     parser.add_argument('--randomFast','--randomFastCommands', default = -1, type=float, dest='randomFastCommands', help='issue random fast commands a certain percent of the time (default is -1, which is off)')
     parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
-    parser.add_argument('-L', type=int, default = -1,dest="NLinks", help="Number of ePortTX links to use, -1 is all in input (default: -1)")
     parser.add_argument('--GodOrbitOffset', type=int, default = 1, dest="GodOrbitOffset", help="Offset in GodOrbit number caused by the startup (default 1)")
     parser.add_argument('--GodBucketOffset', type=int, default = 660, dest="GodBucketOffset", help="Offset in GodBucket number caused by the startup (default 660)")
     parser.add_argument('--counterReset', type=int, default = 3513, dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 3513)")
     parser.add_argument('--hdmFlag', default = None, dest="hdmFlag", choices=[None,'0','1','True','False'], help="Specify whether HDM or not (default None, means read from metaData.py")
     parser.add_argument('--synchHeader', default = '9', dest="synchHeader", help="Value of header to be used at BC0 (default=9)")
     parser.add_argument('--regularHeader', default = 'A', dest="regularHeader", help="Value of header to be everywhere other than BC0 (default=A)")
+    parser.add_argument('--calibration', default = None, dest="calibration", help="Value of calibrations to use")
+    parser.add_argument('--threshold', default = None, dest="threshold", help="Value of thresholds to use")
+    parser.add_argument('--eTx', default = -1, dest="eTx", type=int, help="Number of eTx to use")
+    parser.add_argument('--dropBits', default = -1, dest="dropBits", type=int, help="Number of bits to drop")
+    parser.add_argument('--useSum', default = False, dest="useSum", type=bool, help="Use full sum or sum not transmitted (True corresponds to full sum)")
 
     args = parser.parse_args()
 
@@ -344,8 +348,28 @@ if __name__=='__main__':
                                                           randomSampling=args.RandomSampling,
                                                           synchHeader=args.synchHeader,
                                                           regularHeader=args.regularHeader)
+    
+    CalRegisters=args.calibration
+    try:
+        calReg = float(CalRegisters)
+    except:
+        calReg = CalRegisters
 
-    runEmulator(tempOutputDir, ePortTx=args.NLinks, StopAtAlgoBlock=args.StopAtAlgoBlock, MuxRegisters='passThrough', CalRegisters='passThrough', HDMFlag=args.hdmFlag)
+    ThreshRegister=args.threshold
+    try:
+        thrReg = float(ThreshRegister)
+    except:
+        thrReg = ThreshRegister
+
+    runEmulator(tempOutputDir, 
+                ePortTx=args.eTx, 
+                StopAtAlgoBlock=args.StopAtAlgoBlock, 
+                MuxRegisters='passThrough', 
+                CalRegisters=calReg, 
+                ThresholdRegisters=thrReg, 
+                Use_Sum=args.useSum, 
+                HDMFlag=args.hdmFlag,
+                nDropBits=args.dropBits)
 
     makeVerificationData(tempOutputDir, args.outputDir, stopAtAlgoBlock=args.StopAtAlgoBlock)
 

@@ -76,24 +76,40 @@ def getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion, tpgNtu
         remappedThreshVal[x[1]] = threshVal[x[0]]
 
     if not CalRegisters is None:
-        if 'passThrough' in CalRegisters:
+        if isinstance(CalRegisters, np.ndarray):
+            remappedCalibVal = CalRegisters
+        elif isinstance(CalRegisters,float):
+            calV = int(CalRegisters * 2**11)
+            remappedCalibVal = np.array([calV]*48)
+        elif isinstance(CalRegisters, list):
+            remappedCalibVal = np.array(CalRegisters)
+        elif 'passThrough' in CalRegisters:
             remappedCalibVal = np.array([1<<11]*48,dtype=int)
-        if '.csv' in CalRegisters:
+        elif '.csv' in CalRegisters:
             calV = pd.read_csv(CalRegisters)
             remappedCalibVal = calV.values[0]
-        if type(CalRegisters) is np.ndarray:
-            remappedCalibVal = CalRegisters
-        if type(CalRegisters) is list:
-            remappedCalibVal = np.array(CalRegisters)
 
     if not ThresholdRegisters is None:
-        if '.csv' in ThresholdRegisters:
-            calV = pd.read_csv(ThresholdRegisters)
-            remappedThreshVal = calV.values[0]
-        if type(ThresholdRegisters) is np.ndarray:
+        if isinstance(ThresholdRegisters, np.ndarray):
             remappedThreshVal = ThresholdRegisters
-        if type(ThresholdRegisters) is list:
+        elif isinstance(ThresholdRegisters,float):
+            thrV = int(ThresholdRegisters)
+            remappedThreshVal = np.array([thrV]*48)
+        elif isinstance(ThresholdRegisters, list):
             remappedThreshVal = np.array(ThresholdRegisters)
+        elif 'passThrough' in ThresholdRegisters:
+            remappedThreshVal = np.array([0]*48,dtype=int)
+        elif '.csv' in ThresholdRegisters:
+            thrV = pd.read_csv(ThresholdRegisters)
+            remappedThreshVal = thrV.values[0]
+
+        # if '.csv' in ThresholdRegisters:
+        #     calV = pd.read_csv(ThresholdRegisters)
+        #     remappedThreshVal = calV.values[0]
+        # if type(ThresholdRegisters) is np.ndarray:
+        #     remappedThreshVal = ThresholdRegisters
+        # if type(ThresholdRegisters) is list:
+        #     remappedThreshVal = np.array(ThresholdRegisters)
 
     return remappedCalibVal, remappedThreshVal
     

@@ -6,4 +6,6 @@ Inputs*
 __pycache__
 condor
 verificationData*
+NewVerificationData*
+CristianData*
 test*

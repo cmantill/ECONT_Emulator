@@ -4,6 +4,8 @@ import numpy as np
 from subprocess import Popen, PIPE
 import os
 
+from Utils.encode import encode
+
 def toDecimal(x):
     w = -1. if x[0]=='1' else 0
     w += int(x[1:],2)/2**5
@@ -14,7 +16,6 @@ def convertI2CtoWeights(inputDir):
     I2C_bits = ''
 
     for weight in I2C_values:
-        #I2C_bits = I2C_bits + format(int(weight,16),'01072b')
         I2C_bits = format(int(weight,16),'01072b') + I2C_bits
 
     w2_bits = I2C_bits[-432:]
@@ -45,12 +46,13 @@ bin9 = np.vectorize(bin9)
 def toHex(row):
     return format(int(row['binary'],2),'039x')
 
+encode = np.vectorize(encode)
+
 def Autoencoder(df_CalQ, weights=None):
     df = df_CalQ.copy()
     calColumns = df.columns
-
     cwd = os.path.dirname(__file__)
-    print(cwd)
+
     if not os.path.exists(f'{cwd}/cpp_executables_AutoEncoder/'):
         print(os.getcwd())
         print(cwd) 
@@ -61,7 +63,17 @@ def Autoencoder(df_CalQ, weights=None):
     df.to_csv(f'{cwd}/cpp_executables_AutoEncoder/converter/inputs/tb_converter_inputs.dat',sep=' ',header=False, index=False)
     convertOut = Popen('converter.x',cwd=f"{cwd}/cpp_executables_AutoEncoder/converter",stdout=PIPE).communicate()
 
-    sumDF = pd.read_csv(f'{cwd}/cpp_executables_AutoEncoder/converter/outputs/implementation/tb_converter_sum_outputs.dat',header=None)
+    sumDF = pd.read_csv(f'{cwd}/cpp_executables_AutoEncoder/converter/outputs/implementation/tb_converter_sum_outputs.dat',header=None,names=['encodedSUM'])
+
+    df['SUM'] = df[[f'CALQ_{i}' for i in range(48)]].sum(axis=1)
+    df['encodedSUM'] = encode(df.SUM,0,5,4,asInt=True)
+
+    
+    agreement_SUM = (sumDF==df[['encodedSUM']]).values.all()
+
+    if not agreement_SUM:
+        print('ERROR IN ENCODED SUMS')
+        exit()
 
     if not weights is None:
         np.array(weights[0]).tofile(f'{cwd}/cpp_executables_AutoEncoder/encoder/inputs/weights/w2.txt',sep=', ')

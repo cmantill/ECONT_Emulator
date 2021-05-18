@@ -19,10 +19,37 @@ def newFormat(x):
 
 binV=np.vectorize(newFormat)
 
+def bin32(x, isHex=False,reverse=False):
+    if isHex:
+        v = int(x,16)
+    else:
+        v=x
+    bits = format(v,'032b')
+    if reverse:
+        bits = bits[::-1]
+    return bits
+
+def Serializer(df_Buffer, serializerDelay=101, serializerDelayChange=[0]*13):
+    dfBin = df_Buffer.apply(np.vectorize(bin32))
+    for i in range(13):
+        bitString = ''.join(dfBin[f'TX_DATA_{i}'].values)
+        delay = serializerDelay-serializerDelayChange[i]
+        bitString = '0'*(delay) + bitString[:(-1*delay)]
+        x = [format(int(bitString[i:i+32][::-1],2),'08x') for i in range(0,len(bitString),32)]
+        y = np.array(x)
+        dfBin[f'ETX_{i}'] = y
+#        dfBin[f'ETX_{i}'] = np.array([format(int(bitString[i:i+32][::-1],2),'08x') for i in range(0,len(bitString),32)])
+    return dfBin[[f'ETX_{i}' for i in range(13)]]
+
 def findAlignmentTiming(inputDir):
     linkResetTimestamp = -1
     try:
-        with open(f"{inputDir.replace('IO','RPT')}/Channel_Aligner_Assertion_File.txt") as alignmentFile:
+        fName = ''
+        if '/IO/' in inputDir:
+            fName  = f"{inputDir.replace('/IO/','/RPT/')}/Channel_Aligner_Assertion_File.txt"
+        elif '/UVM/' in inputDir:
+            fName  = f"{inputDir.replace('/UVM/','/RPT/')}/Channel_Aligner_Assertion_File.txt"
+        with open(fName) as alignmentFile:
             for line in alignmentFile:
                 if 'Found Link Reset at Timestamp' in line:
                     x=np.array(line.split())
@@ -67,7 +94,7 @@ def AlgorithmRoutine(inputDir, algo, verbose=True, df_CALQ=None):
     df_CALQ.reset_index(inplace=True,drop=True)
     df_DropLSB = pd.read_csv(f'{inputDir}/Algorithm_Input_DropLSB.csv',skipinitialspace=True,comment=commentChar)
     df_DropLSB.loc[df_DropLSB.DROP_LSB>4] = 0
-    df_Header = pd.read_csv(f'{inputDir}/Algorithm_Input_Header.csv',skipinitialspace=True,comment=commentChar)
+#    df_Header = pd.read_csv(f'{inputDir}/Algorithm_Input_Header.csv',skipinitialspace=True,comment=commentChar)
     df_Threshold = pd.read_csv(f'{inputDir}/Algorithm_Input_Threshold.csv',skipinitialspace=True,comment=commentChar)
 
     if algo==0: #threshold sum
@@ -275,10 +302,11 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
     df_ePortRxDataGroup = None
 
     alignmentTime, snapshotTime, snapshotOrbit, snapshotBucket = findAlignmentTiming(inputDir)
-    
+
     if not forceAlignmentTime is None:
         alignmentTime =forceAlignmentTime
-
+    if verbose:
+        print(f'Alignment time = {alignmentTime}')
     comparisonColumns=None
 
     if ASICBlock=='Algorithm':
@@ -340,6 +368,48 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
             df_Comparison.columns = [f'TX_DATA_{i}' for i in range(13)]
         except:
             df_Comparison = None
+
+        hexOutput=True
+
+    elif ASICBlock=='BufferSerializer':
+        latency=1
+
+        df_FrameQ=pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_FrameQ.csv', skipinitialspace=True,comment=commentChar)[[f'BUF_INP_FRMQ_{i}' for i in range(26)]]
+        df_FrameQ.columns = [f'FRAMEQ_{i}' for i in range(26)]
+        df_FrameQ_NumW=pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_FrameQ_NumW.csv', skipinitialspace=True,comment=commentChar)
+        df_FrameQ_NumW.columns=['FRAMEQ_NUMW']
+        df_FrameQTruncated=pd.read_csv(f'{inputDir}/Formatter_Buffer_Input_FrameQTruncated.csv', skipinitialspace=True,comment=commentChar)[['BUF_INP_FRMQT_0','BUF_INP_FRMQT_1']]
+        df_FrameQTruncated.columns = ['FRAMEQ_Truncated_0','FRAMEQ_Truncated_1']
+
+        df_FormatterOutput = df_FrameQ.merge(df_FrameQ_NumW, left_index=True, right_index=True).merge(df_FrameQTruncated, left_index=True, right_index=True)
+
+        T1 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T1.csv')
+        T2 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T2.csv')
+        T3 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T3.csv')
+        if EPortTx_NumEn is None:
+            EPortTx_NumEn = getRegister(f'{inputDir}/Formatter_Buffer_Input_EPortTx_NumEn.csv')
+
+        if verbose: print('Running Buffer')
+        df_Buffer = Buffer(df_FormatterOutput, EPortTx_NumEn, T1, T2, T3)
+        if verbose: print('   --- Finished Buffer')
+
+        serializerDelay=101
+        serializerDelayChange=[0]*13
+
+        try:
+            df_Comparison = None
+            for iETX in range(13):
+                dETX = pd.read_csv(f'{inputDir}/ETX_{format(iETX,"02")}.csv',dtype=str,skipinitialspace=True,comment=commentChar)[['OUT_DATA_PIN','INP_1G28_EN_ABC_40MHZ']]
+                serializerDelayChange[iETX] = int(np.log2(int(dETX.INP_1G28_EN_ABC_40MHZ.values[0],16)))
+                if df_Comparison is None:
+                    df_Comparison = dETX[['OUT_DATA_PIN']]
+                    df_Comparison.columns = [f'ETX_{iETX}']
+                else:
+                    df_Comparison[f'ETX_{iETX}'] = dETX[['OUT_DATA_PIN']]
+        except:
+            df_Comparison = None
+
+        df_Emulator=Serializer(df_Buffer, serializerDelay, serializerDelayChange)
 
         hexOutput=True
 
@@ -448,7 +518,7 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
         hexOutput=True
 
     elif ASICBlock=="Front":
-        latency=10
+        latency=11
         if eRx_DataDir is None:
             eRx_DataDir=inputDir
         try:
@@ -498,7 +568,7 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
 
         df_CalQ = Calibrate(df_F2F, CALVALUE_Registers)
 
-        front_Latency=10
+        front_Latency=11
 
         algo = getRegister(f'{inputDir}/Formatter_Buffer_Input_Algorithm_Type.csv')
         if EPortTx_NumEn is None:
@@ -531,7 +601,7 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
 
         df_CalQ = Calibrate(df_F2F, CALVALUE_Registers)
 
-        front_Latency=10
+        front_Latency=11
         front_LinkReset_Offset = 6
 
         algo = getRegister(f'{inputDir}/Formatter_Buffer_Input_Algorithm_Type.csv')
@@ -574,7 +644,94 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
 
         hexOutput=True
 
-    elif ASICBlock=="Full":
+    elif ASICBlock=="FormatterBufferSerializer":
+        algo = getRegister(f'{inputDir}/Formatter_Buffer_Input_Algorithm_Type.csv')
+        if EPortTx_NumEn is None:
+            EPortTx_NumEn = getRegister(f'{inputDir}/Formatter_Buffer_Input_EPortTx_NumEn.csv')
+
+        df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, verbose=verbose, linkResetOffset=linkResetOffset)
+
+        T1 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T1.csv')
+        T2 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T2.csv')
+        T3 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T3.csv')
+
+        if verbose: print('Running Buffer')
+        df_Buffer = Buffer(df_Emulator_Formatter, EPortTx_NumEn, T1, T2, T3)
+        if verbose: print('   --- Finished Buffer')
+
+        serializerDelay=101
+        serializerDelayChange=[0]*13
+
+        try:
+            df_Comparison = None
+            for iETX in range(13):
+                dETX = pd.read_csv(f'{inputDir}/ETX_{format(iETX,"02")}.csv',dtype=str,skipinitialspace=True,comment=commentChar)[['OUT_DATA_PIN','INP_1G28_EN_ABC_40MHZ']]
+                serializerDelayChange[iETX] = int(np.log2(int(dETX.INP_1G28_EN_ABC_40MHZ.values[0],16)))
+                if df_Comparison is None:
+                    df_Comparison = dETX[['OUT_DATA_PIN']]
+                    df_Comparison.columns = [f'ETX_{iETX}']
+                else:
+                    df_Comparison[f'ETX_{iETX}'] = dETX[['OUT_DATA_PIN']]
+        except:
+            df_Comparison = None
+
+        df_Emulator=Serializer(df_Buffer, serializerDelay, serializerDelayChange)
+
+
+        latency=formatter_Latency + 1
+        hexOutput=True
+
+    elif ASICBlock=="AlgorithmThroughSerializer":
+
+        algo = getRegister(f'{inputDir}/Formatter_Buffer_Input_Algorithm_Type.csv')
+        if EPortTx_NumEn is None:
+            EPortTx_NumEn = getRegister(f'{inputDir}/Formatter_Buffer_Input_EPortTx_NumEn.csv')
+
+        df_Emulator_Algo, df_Comparison, algo_Latency = AlgorithmRoutine(inputDir, algo, verbose=verbose)
+
+        if algo==0: #threshold sum
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_Threshold_Sum=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, linkResetOffset=linkResetOffset)
+        if algo==1: #STC
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_STC=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, linkResetOffset=linkResetOffset)
+        if algo==2: #BC
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_BestChoice=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, linkResetOffset=linkResetOffset)
+        if algo==3: #Repeater
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_Repeater=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, linkResetOffset=linkResetOffset)
+        if algo==4: #Autoencoder
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_Autoencoder=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, linkResetOffset=linkResetOffset)
+
+        T1 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T1.csv')
+        T2 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T2.csv')
+        T3 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T3.csv')
+
+        if verbose: print('Running Buffer')
+        df_Buffer = Buffer(df_Emulator_Formatter, EPortTx_NumEn, T1, T2, T3)
+        if verbose: print('   --- Finished Buffer')
+
+        serializerDelay=101
+        serializerDelayChange=[0]*13
+
+        try:
+            df_Comparison = None
+            for iETX in range(13):
+                dETX = pd.read_csv(f'{inputDir}/ETX_{format(iETX,"02")}.csv',dtype=str,skipinitialspace=True,comment=commentChar)[['OUT_DATA_PIN','INP_1G28_EN_ABC_40MHZ']]
+                serializerDelayChange[iETX] = int(np.log2(int(dETX.INP_1G28_EN_ABC_40MHZ.values[0],16)))
+                if df_Comparison is None:
+                    df_Comparison = dETX[['OUT_DATA_PIN']]
+                    df_Comparison.columns = [f'ETX_{iETX}']
+                else:
+                    df_Comparison[f'ETX_{iETX}'] = dETX[['OUT_DATA_PIN']]
+        except:
+            df_Comparison = None
+
+        df_Emulator=Serializer(df_Buffer, serializerDelay, serializerDelayChange)
+
+
+        latency = algo_Latency + formatter_Latency + 1
+        hexOutput=True
+
+
+    elif ASICBlock=="FullNoSerializer":
 
         latency=0
         if eRx_DataDir is None:
@@ -598,7 +755,7 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
 
         df_CalQ = Calibrate(df_F2F, CALVALUE_Registers)
 
-        front_Latency=10
+        front_Latency=11
         front_LinkReset_Offset=6
 
         algo = getRegister(f'{inputDir}/Formatter_Buffer_Input_Algorithm_Type.csv')
@@ -636,6 +793,83 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
             df_Comparison.columns = [f'TX_DATA_{i}' for i in range(13)]
         except:
             df_Comparison = None
+
+        latency = front_Latency + algo_Latency + formatter_Latency + 1
+
+        hexOutput=True
+
+    elif ASICBlock=="Full":
+
+        latency=0
+        if eRx_DataDir is None:
+            eRx_DataDir=inputDir
+        try:
+            df_ePortRxDataGroup, df_BX_CNT, df_SimEnergyStatus, df_linkReset = loadEportRXData(eRx_DataDir,alignmentTime=alignmentTime)
+        except:
+            print(f'No EPortRx data found in directory {eRx_DataDir}')
+            exit()
+            
+        columns = [f'ePortRxDataGroup_{i}' for i in range(12)]
+        df_Mux_in = splitEportRXData(df_ePortRxDataGroup[columns])
+
+        MuxRegisters = getRegister(f'{inputDir}/MuxFixCalib_Input_MuxSelect.csv')
+
+        df_Mux_out = Mux(df_Mux_in, MuxRegisters)
+        isHDM = getRegister(f'{inputDir}/MuxFixCalib_Input_HighDensity.csv')
+
+        df_F2F = FloatToFix(df_Mux_out, isHDM)
+        CALVALUE_Registers = getRegister(f'{inputDir}/MuxFixCalib_Input_CalValue.csv')
+
+        df_CalQ = Calibrate(df_F2F, CALVALUE_Registers)
+
+        front_Latency=11
+        front_LinkReset_Offset=6
+
+        algo = getRegister(f'{inputDir}/Formatter_Buffer_Input_Algorithm_Type.csv')
+
+        if EPortTx_NumEn is None:
+            EPortTx_NumEn = getRegister(f'{inputDir}/Formatter_Buffer_Input_EPortTx_NumEn.csv')
+
+        df_Emulator_Algo, df_Comparison, algo_Latency = AlgorithmRoutine(inputDir, algo, verbose=verbose, df_CALQ = df_CalQ)
+
+        if linkResetOffset is None:
+            linkResetOffset = front_LinkReset_Offset + algo_Latency
+
+        if algo==0: #threshold sum
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_Threshold_Sum=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, df_LinkReset=df_linkReset, df_BX_CNT=df_BX_CNT, linkResetOffset=linkResetOffset)
+        if algo==1: #STC
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_STC=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, df_LinkReset=df_linkReset, df_BX_CNT=df_BX_CNT, linkResetOffset=linkResetOffset)
+        if algo==2: #BC
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_BestChoice=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, df_LinkReset=df_linkReset, df_BX_CNT=df_BX_CNT, linkResetOffset=linkResetOffset)
+        if algo==3: #Repeater
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_Repeater=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, df_LinkReset=df_linkReset, df_BX_CNT=df_BX_CNT, linkResetOffset=linkResetOffset)
+        if algo==4: #Autoencoder
+            df_Emulator_Formatter, formatter_Latency = FormatterRoutine(inputDir, algo, EPortTx_NumEn, df_Autoencoder=df_Emulator_Algo, verbose=verbose, algoLatency=algo_Latency, df_LinkReset=df_linkReset, df_BX_CNT=df_BX_CNT, linkResetOffset=linkResetOffset)
+
+        T1 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T1.csv')
+        T2 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T2.csv')
+        T3 = getRegister(f'{inputDir}/Formatter_Buffer_Input_Buffer_Threshold_T3.csv')
+
+        if verbose: print('Running Buffer')
+        df_Buffer = Buffer(df_Emulator_Formatter, EPortTx_NumEn, T1, T2, T3)
+        if verbose: print('   --- Finished Buffer')
+        serializerDelay=101
+        serializerDelayChange=[0]*13
+
+        try:
+            df_Comparison = None
+            for iETX in range(13):
+                dETX = pd.read_csv(f'{inputDir}/ETX_{format(iETX,"02")}.csv',dtype=str,skipinitialspace=True,comment=commentChar)[['OUT_DATA_PIN','INP_1G28_EN_ABC_40MHZ']]
+                serializerDelayChange[iETX] = int(np.log2(int(dETX.INP_1G28_EN_ABC_40MHZ.values[0],16)))
+                if df_Comparison is None:
+                    df_Comparison = dETX[['OUT_DATA_PIN']]
+                    df_Comparison.columns = [f'ETX_{iETX}']
+                else:
+                    df_Comparison[f'ETX_{iETX}'] = dETX[['OUT_DATA_PIN']]
+        except:
+            df_Comparison = None
+
+        df_Emulator=Serializer(df_Buffer, serializerDelay, serializerDelayChange)
 
         latency = front_Latency + algo_Latency + formatter_Latency + 1
 
@@ -724,7 +958,7 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
             print("GOOD AGREEMENT")
             print()
 
-        if 'Buffer' in ASICBlock:
+        if 'Buffer' in ASICBlock and not 'Serializer' in ASICBlock:
             print()
             print('Buffer Control Summary Counts')
             x = df_Emulator[[f'Cond{i}' for i in range(1,5)]]

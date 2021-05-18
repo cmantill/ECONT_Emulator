@@ -76,40 +76,46 @@ def getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion, tpgNtu
         remappedThreshVal[x[1]] = threshVal[x[0]]
 
     if not CalRegisters is None:
-        if isinstance(CalRegisters, np.ndarray):
-            remappedCalibVal = CalRegisters
-        elif isinstance(CalRegisters,float):
-            calV = int(CalRegisters * 2**11)
+        try:
+            calV = float(CalRegisters)
+        except:
+            try:
+                calV = eval(CalRegisters)
+            except:
+                calV = CalRegisters
+        if isinstance(calV, np.ndarray):
+            remappedCalibVal = calV
+        elif isinstance(calV,float):
+            calV = int(calV * 2**11)
             remappedCalibVal = np.array([calV]*48)
-        elif isinstance(CalRegisters, list):
-            remappedCalibVal = np.array(CalRegisters)
-        elif 'passThrough' in CalRegisters:
+        elif isinstance(calV, list):
+            remappedCalibVal = np.array(calV)
+        elif 'passThrough' in calV:
             remappedCalibVal = np.array([1<<11]*48,dtype=int)
-        elif '.csv' in CalRegisters:
-            calV = pd.read_csv(CalRegisters)
+        elif '.csv' in calV:
+            calV = pd.read_csv(calV)
             remappedCalibVal = calV.values[0]
 
     if not ThresholdRegisters is None:
-        if isinstance(ThresholdRegisters, np.ndarray):
-            remappedThreshVal = ThresholdRegisters
-        elif isinstance(ThresholdRegisters,float):
-            thrV = int(ThresholdRegisters)
+        try:
+            threshV = float(ThresholdRegisters)
+        except:
+            try:
+                threshV = eval(ThresholdRegisters)
+            except:
+                threshV = ThresholdRegisters
+        if isinstance(threshV, np.ndarray):
+            remappedThreshVal = threshV
+        elif isinstance(threshV,float):
+            thrV = int(threshV)
             remappedThreshVal = np.array([thrV]*48)
-        elif isinstance(ThresholdRegisters, list):
-            remappedThreshVal = np.array(ThresholdRegisters)
-        elif 'passThrough' in ThresholdRegisters:
+        elif isinstance(threshV, list):
+            remappedThreshVal = np.array(threshV)
+        elif 'passThrough' in threshV:
             remappedThreshVal = np.array([0]*48,dtype=int)
-        elif '.csv' in ThresholdRegisters:
-            thrV = pd.read_csv(ThresholdRegisters)
+        elif '.csv' in threshV:
+            thrV = pd.read_csv(threshV)
             remappedThreshVal = thrV.values[0]
-
-        # if '.csv' in ThresholdRegisters:
-        #     calV = pd.read_csv(ThresholdRegisters)
-        #     remappedThreshVal = calV.values[0]
-        # if type(ThresholdRegisters) is np.ndarray:
-        #     remappedThreshVal = ThresholdRegisters
-        # if type(ThresholdRegisters) is list:
-        #     remappedThreshVal = np.array(ThresholdRegisters)
 
     return remappedCalibVal, remappedThreshVal
     

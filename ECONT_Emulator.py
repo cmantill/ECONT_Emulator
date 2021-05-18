@@ -185,6 +185,8 @@ if __name__=='__main__':
     parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
     parser.add_argument('--AEMuxOrdering', dest="AEMuxOrdering", default=False, action="store_true", help='Use MUX settings to use ordering from autoencoder')
     parser.add_argument('--SimEnergyFlag', dest="SimEnergyFlag", default=False, action="store_true", help='Add flag of whether sim energy is present to the CALQ dataframe')
+    parser.add_argument('--calibration', default = None, dest="CalRegisters", help="Value of calibrations to use")
+    parser.add_argument('--threshold', default = None, dest="ThresholdRegisters", help="Value of thresholds to use")
 
     args = parser.parse_args()
     

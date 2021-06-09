@@ -30,12 +30,13 @@ def bin32(x, isHex=False,reverse=False):
     return bits
 
 def Serializer(df_Buffer, serializerDelay=101, serializerDelayChange=[0]*13):
-    dfBin = df_Buffer.apply(np.vectorize(bin32))
+    dfBin = df_Buffer.apply(np.vectorize(bin32),reverse=True)
     for i in range(13):
         bitString = ''.join(dfBin[f'TX_DATA_{i}'].values)
         delay = serializerDelay-serializerDelayChange[i]
         bitString = '0'*(delay) + bitString[:(-1*delay)]
-        x = [format(int(bitString[i:i+32][::-1],2),'08x') for i in range(0,len(bitString),32)]
+        x = [format(int(bitString[i:i+32],2),'08x') for i in range(0,len(bitString),32)]
+        #x = [format(int(bitString[i:i+32][::-1],2),'08x') for i in range(0,len(bitString),32)]
         y = np.array(x)
         dfBin[f'ETX_{i}'] = y
 #        dfBin[f'ETX_{i}'] = np.array([format(int(bitString[i:i+32][::-1],2),'08x') for i in range(0,len(bitString),32)])
@@ -295,7 +296,7 @@ def hex32(x):
     return format(x, '08x')
 hex32 = np.vectorize(hex32)
 
-def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPortTx_NumEn=None, eRx_DataDir=None, bxSkip=None, forceLatency=None, forceAlignmentTime=None, linkResetOffset=None, skipComparison=False):
+def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPortTx_NumEn=None, eRx_DataDir=None, bxSkip=None, serializerDelay=101, forceLatency=None, forceAlignmentTime=None, linkResetOffset=None, skipComparison=False):
     hexOutput=False
     verbose= not Quiet
 
@@ -393,7 +394,6 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
         df_Buffer = Buffer(df_FormatterOutput, EPortTx_NumEn, T1, T2, T3)
         if verbose: print('   --- Finished Buffer')
 
-        serializerDelay=101
         serializerDelayChange=[0]*13
 
         try:
@@ -659,7 +659,6 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
         df_Buffer = Buffer(df_Emulator_Formatter, EPortTx_NumEn, T1, T2, T3)
         if verbose: print('   --- Finished Buffer')
 
-        serializerDelay=101
         serializerDelayChange=[0]*13
 
         try:
@@ -708,7 +707,6 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
         df_Buffer = Buffer(df_Emulator_Formatter, EPortTx_NumEn, T1, T2, T3)
         if verbose: print('   --- Finished Buffer')
 
-        serializerDelay=101
         serializerDelayChange=[0]*13
 
         try:
@@ -853,7 +851,7 @@ def runVerification(inputDir, outputDir, ASICBlock, Quiet=False, algo=None, EPor
         if verbose: print('Running Buffer')
         df_Buffer = Buffer(df_Emulator_Formatter, EPortTx_NumEn, T1, T2, T3)
         if verbose: print('   --- Finished Buffer')
-        serializerDelay=101
+
         serializerDelayChange=[0]*13
 
         try:
@@ -1001,6 +999,7 @@ if __name__=='__main__':
     parser.add_argument('--eRx',dest="eRx_DataDir", default=None, help='Location to look for input data to EPortRX used in simulation')
     parser.add_argument('--skip', '--bxSkip',dest="bxSkip", default=None,  help='Number of BX to skip before starting the comparison')
     parser.add_argument('-l', '--latency',dest="forceLatency", default=None, type=int, help='Latency to use, if None, use assumptions based on blocks run')
+    parser.add_argument('--delay','--serializerDelay',dest="serializerDelay", default=101, type=int, help='Initial delay of serializer, in bits, default of 101')
     parser.add_argument('--alignment', '--align',dest="forceAlignmentTime", default=None, type=int, help='Alignment time to use, if None, use what can be found from sim information')
     parser.add_argument('-r', '--reset','--resetOffset',dest="linkResetOffset", default=None, type=int, help='Amount to move the link reset offset by')
     parser.add_argument('-q','--quiet', dest="Quiet", default=False, action='store_true', help='Quiet outputs')

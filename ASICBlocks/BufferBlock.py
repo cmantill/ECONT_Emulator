@@ -25,14 +25,14 @@ def Buffer(df_formatterOutput, EPORTTX_NUMEN, T1 , T2, T3):
         if (Nbuf + NBXc) > T1:
             truncated = True
             ### explicitly set eighth bit to 0
-            truncatedData[0] = truncatedData[0] | (1<<8)
+            truncatedData[0] = truncatedData[0] & ~(1<<8)
 
             BufferContents[writePointer:writePointer+2] = truncatedData
             cond1 = True
         elif ((Nbuf + NBXc) <= T1) and (Nbuf > T2) and (NBXc <= T3):
             truncated = True
             ### explicitly set eighth bit to 1
-            truncatedData[0] = truncatedData[0] & ~(1<<8)
+            truncatedData[0] = truncatedData[0] | (1<<8)
 
             BufferContents[writePointer:writePointer+2] = truncatedData
             cond2 = True

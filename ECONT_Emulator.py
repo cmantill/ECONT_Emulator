@@ -112,11 +112,11 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     if Buff_T1 is not None:
         BUFFER_THRESHOLD_T1 = Buff_T1
     else:
-        BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*13*2
+        BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*12*2
     if Buff_T2 is not None:
         BUFFER_THRESHOLD_T2 = Buff_T2
     else:
-        BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*13*2-24
+        BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*12*2-25
     if Buff_T3 is not None:
         BUFFER_THRESHOLD_T3 = Buff_T3
     else:

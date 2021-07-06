@@ -20,11 +20,15 @@ from ASICBlocks.Formatter import Format_Threshold_Sum, Format_BestChoice, Format
 from ASICBlocks.BufferBlock import Buffer
 
 
-def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False, MuxRegisters=None, CalRegisters=None, ThresholdRegisters=None):
+def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False, MuxRegisters=None, CalRegisters=None, HDMFlag=None, ThresholdRegisters=None, Buff_T1=None, Buff_T2=None, Buff_T3=None):
     if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
-    df_ePortRxDataGroup, df_BX_CNT, df_SimEnergyStatus = loadEportRXData(inputDir,SimEnergyFlag)
+    df_ePortRxDataGroup, df_BX_CNT, df_SimEnergyStatus, df_linkReset = loadEportRXData(inputDir,SimEnergyFlag)
 
+    if not HDMFlag is None:
+        isHDM=False
+        if HDMFlag in ['1',1,'True',True]:
+            isHDM=True
     if outputDir is None:
         outputDir = inputDir
 
@@ -91,6 +95,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
             print('Using EPORTTX_NUMEN=4')
             EPORTTX_NUMEN=4
 
+    print(f'Using EPORTTX_NUMEN={EPORTTX_NUMEN}')
     if STC_Type==-1:
         STC_TYPE=0 if isHDM else 1
     else:
@@ -104,9 +109,20 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     pd.DataFrame([[STC_TYPE]], columns=['STC_TYPE'],index=df_CALQ.index).to_csv(f'{outputDir}/STC_TYPE.csv', index=saveIndex)
     pd.DataFrame([[Use_Sum]], columns=['USE_SUM'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=saveIndex)
 
-    BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*13*2
-    BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*13*2-24
-    BUFFER_THRESHOLD_T3 = 25
+    if Buff_T1 is not None:
+        BUFFER_THRESHOLD_T1 = Buff_T1
+    else:
+        BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*13*2
+    if Buff_T2 is not None:
+        BUFFER_THRESHOLD_T2 = Buff_T2
+    else:
+        BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*13*2-24
+    if Buff_T3 is not None:
+        BUFFER_THRESHOLD_T3 = Buff_T3
+    else:
+        BUFFER_THRESHOLD_T3 = 25
+
+
 
     pd.DataFrame([[int(BUFFER_THRESHOLD_T1)]], columns=['BUFFER_THRESHOLD_T1'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T1.csv', index=saveIndex)
     pd.DataFrame([[int(BUFFER_THRESHOLD_T2)]], columns=['BUFFER_THRESHOLD_T2'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T2.csv', index=saveIndex)
@@ -121,15 +137,15 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     df_SuperTriggerCell.to_csv(f'{outputDir}/SuperTriggerCell.csv',index=saveIndex)
     df_Repeater.to_csv(f'{outputDir}/Repeater.csv',index=saveIndex)
 
-    try:
-        df_linkReset = pd.read_csv(f'{inputDir}/LinkResetEconT.csv')
-    except:
-        df_linkReset = pd.DataFrame({'LINKRESETECONT':0},index=df_CALQ.index)
+    # try:
+    #     df_linkReset = pd.read_csv(f'{inputDir}/LinkResetEconT.csv')
+    # except:
+    #     df_linkReset = pd.DataFrame({'LINKRESETECONT':0},index=df_CALQ.index)
 
     del df_CALQ
 
     print('Formatter/Buffer Threshold-Sum')
-    df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum)
+    df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum, EPORTTX_NUMEN, df_linkReset)
     df_BufferOutput_TS  = Buffer(df_Format_TS,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Threshold_Sum
     df_Format_TS.to_csv(f'{outputDir}/Format_TS.csv',index=saveIndex)
@@ -138,7 +154,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     del df_BufferOutput_TS
 
     print('Formatter/Buffer Best Choice')
-    df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum)
+    df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum, df_linkReset)
     df_BufferOutput_BC  = Buffer(df_Format_BC,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_BestChoice
     df_Format_BC.to_csv(f'{outputDir}/Format_BC.csv',index=saveIndex)
@@ -147,7 +163,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     del df_BufferOutput_BC
 
     print('Formatter/Buffer STC')
-    df_Format_STC = Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord)
+    df_Format_STC = Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, df_linkReset)
     df_BufferOutput_STC = Buffer(df_Format_STC, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_SuperTriggerCell
     df_Format_STC.to_csv(f'{outputDir}/Format_STC.csv',index=saveIndex)
@@ -156,7 +172,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     del df_BufferOutput_STC
 
     print('Formatter/Buffer Repeater')
-    df_Format_RPT = Format_Repeater(df_Repeater, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord)    
+    df_Format_RPT = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord, EPORTTX_NUMEN, df_linkReset)
     df_BufferOutput_RPT = Buffer(df_Format_RPT, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
     del df_Repeater
     df_Format_RPT.to_csv(f'{outputDir}/Format_RPT.csv',index=saveIndex)
@@ -179,6 +195,11 @@ if __name__=='__main__':
     parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
     parser.add_argument('--AEMuxOrdering', dest="AEMuxOrdering", default=False, action="store_true", help='Use MUX settings to use ordering from autoencoder')
     parser.add_argument('--SimEnergyFlag', dest="SimEnergyFlag", default=False, action="store_true", help='Add flag of whether sim energy is present to the CALQ dataframe')
+    parser.add_argument('--calibration', default = None, dest="CalRegisters", help="Value of calibrations to use")
+    parser.add_argument('--threshold', default = None, dest="ThresholdRegisters", help="Value of thresholds to use")
+    parser.add_argument('--T1', type=int, default = None, dest="Buff_T1", help="Buffer threshold T1")
+    parser.add_argument('--T2', type=int, default = None, dest="Buff_T2",help="Buffer threshold T2")
+    parser.add_argument('--T3', type=int, default = None, dest="Buff_T3",help="Buffer threshold T3")
 
     args = parser.parse_args()
     

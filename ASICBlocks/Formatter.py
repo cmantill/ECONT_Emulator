@@ -8,11 +8,16 @@ def splitToWords(row, N=16,totalWords=26):
     fullData = row['FullDataString']
     
     words = [int(fullData[i*N:(i+1)*N],2) for i in range(int(len(fullData)/N))]
-        
+
     if len(words)<totalWords:
         words += [row['IdleWord']]*(totalWords-len(words))
 
     return words
+
+def binFormat(x,N):
+    return format(x,f'0{N}b')
+
+binFormat=np.vectorize(binFormat)
 
 Threshold_WordsPerNTCQ = {8  : 8 ,
                           9  : 8 ,
@@ -45,7 +50,7 @@ Threshold_WordsPerNTCQ = {8  : 8 ,
                           36 : 20,
                           37 : 21,
                           38 : 21,
-                          39 : 21,
+                          39 : 22,
                           40 : 22,
                           41 : 22,
                           42 : 23,
@@ -142,7 +147,7 @@ def formatTruncatedOutput(row):
     return int(formattedData_Truncated,2)
 
 
-def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum):
+def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum, EPORTTX_NUMEN, df_LinkReset):
 
     df_in = pd.merge(df_Threshold_Sum, df_BX_CNT, left_index=True, right_index=True)
 
@@ -159,13 +164,30 @@ def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum):
 
     df_Format = pd.DataFrame(df_in.apply(formatThresholdOutput, axis=1).values,columns=['FullDataString'],index=df_in.index)
 
-    df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
+    linkResetStatus = np.zeros(len(df_Format),dtype=int)
+    linkResetSignalBX = np.where(df_LinkReset['LINKRESETECONT'].values==1)[0]+1
+    for reset_BX in linkResetSignalBX:
+        linkResetStatus[reset_BX:reset_BX+256] = 1
 
+    df_Format['LinkResetStatus'] = linkResetStatus
+
+    df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
+    
     if type(TxSyncWord) is pd.DataFrame:
         df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values
     else:
         df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
         
+    #Insert link reset signal into data stream
+    # if type(TxSyncWord) is pd.DataFrame:
+    #     df_Format['RESET_SIGNAL'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values
+    # else:
+    #     df_Format['RESET_SIGNAL'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+    df_Format['RESET_SIGNAL']= df_Format['IdleWord'].apply(binFormat,N=16)*(EPORTTX_NUMEN*2)
+
+    df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
+    df_Format.loc[np.where(df_Format.LinkResetStatus==1)[0],'FullDataString'] = df_Format.loc[np.where(df_Format.LinkResetStatus==1)[0],'RESET_SIGNAL'].values
+
     frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
     df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
@@ -173,7 +195,10 @@ def Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum):
     df_Format['FRAMEQ_Truncated_0'] = df_in.apply(formatTruncatedOutput,axis=1)
     df_Format['FRAMEQ_Truncated_1'] = df_Format.IdleWord
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
+    #zero out truncated data when in link reset mode
+    df_Format.loc[np.where(df_Format.LinkResetStatus==1)[0],['FRAMEQ_Truncated_0','FRAMEQ_Truncated_1']] = 0
+
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord','LinkResetStatus']]
 
 
 def formatBestChoiceOutput(row, nTC = 1, debug=False):
@@ -256,7 +281,7 @@ def formatBestChoiceOutput(row, nTC = 1, debug=False):
 
 from Utils.linkAllocation import tcPerLink
 
-def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum):
+def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum, df_LinkReset):
     df_in = pd.merge(df_BestChoice, df_BX_CNT, left_index=True, right_index=True)
 
     if not type(Use_Sum) is pd.DataFrame:
@@ -272,15 +297,32 @@ def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_S
 
     df_Format = pd.DataFrame(df_in.apply(formatBestChoiceOutput, nTC=tcPerLink[EPORTTX_NUMEN], axis=1).values,columns=['FullDataString'],index=df_in.index)
 
+    linkResetStatus = np.zeros(len(df_Format),dtype=int)
+    linkResetSignalBX = np.where(df_LinkReset['LINKRESETECONT'].values==1)[0]+1
+
+    #Remove 2 BX of latency in starting time (due to 3 BX latency of this block, reset will start 2 'early')
+    linkResetSignalBX = linkResetSignalBX - 2
+
+    for reset_BX in linkResetSignalBX:
+        linkResetStatus[reset_BX:reset_BX+256] = 1
+
+    df_Format['LinkResetStatus'] = linkResetStatus
+
     df_Format['FRAMEQ_NUMW'] = 2*EPORTTX_NUMEN if EPORTTX_NUMEN<13 else 25
-#    df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
 
     df_Format['IdleWord'] = 0
-    # if type(TxSyncWord) is pd.DataFrame:
-    #     df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values
-    # else:
-    #     df_Format['IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
-        
+
+    #Insert link reset signal into data stream
+    linkResetBXlist = np.where(df_Format.LinkResetStatus==1)[0]
+    if type(TxSyncWord) is pd.DataFrame:
+        df_Format.loc[linkResetBXlist,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values)[linkResetBXlist]
+    else:
+        df_Format.loc[linkResetBXlist,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord)[linkResetBXlist]
+    df_Format['RESET_SIGNAL']= df_Format['IdleWord'].apply(binFormat,N=16)*(EPORTTX_NUMEN*2)
+
+    df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
+    df_Format.loc[linkResetBXlist,'FullDataString'] = df_Format.loc[linkResetBXlist,'RESET_SIGNAL'].values
+
     frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
     df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
@@ -288,7 +330,7 @@ def Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_S
     df_Format['FRAMEQ_Truncated_0'] = 0
     df_Format['FRAMEQ_Truncated_1'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord','LinkResetStatus']]
 
 
 
@@ -434,7 +476,7 @@ def formatCTC_4_7(row, nSTC, debug=False):
 
 
 
-def Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord):
+def Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, df_LinkReset):
     df_in = pd.merge(df_SuperTriggerCell, df_BX_CNT, left_index=True, right_index=True)
 
     if STC_TYPE==0: #STC4_9
@@ -458,11 +500,38 @@ def Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_
         if EPORTTX_NUMEN>4:
             df_Format['FullDataString'] = ''
         
+    linkResetStatus = np.zeros(len(df_Format),dtype=int)
+    linkResetSignalBX = np.where(df_LinkReset['LINKRESETECONT'].values==1)[0]+1
+    for reset_BX in linkResetSignalBX:
+        linkResetStatus[reset_BX:reset_BX+256] = 1
+
+    df_Format['LinkResetStatus'] = linkResetStatus
+
     df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
 
     df_Format.loc[df_Format.FRAMEQ_NUMW==0,'FRAMEQ_NUMW']=2
         
     df_Format['IdleWord'] = 0 #(df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+
+    #Insert link reset signal into data stream
+    linkResetBXlist = np.where(df_Format.LinkResetStatus==1)[0]
+    if type(TxSyncWord) is pd.DataFrame:
+        df_Format.loc[linkResetBXlist,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values)[linkResetBXlist]
+    else:
+        df_Format.loc[linkResetBXlist,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord)[linkResetBXlist]
+    df_Format['RESET_SIGNAL']= df_Format['IdleWord'].apply(binFormat,N=16)*(EPORTTX_NUMEN*2)
+
+    df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
+    df_Format.loc[linkResetBXlist,'FullDataString'] = df_Format.loc[linkResetBXlist,'RESET_SIGNAL'].values
+    # linkResetBXlist = np.where(df_Format.LinkResetStatus==1)[0]
+    # if type(TxSyncWord) is pd.DataFrame:
+    #     df_Format.loc[df_Format.LinkResetStatus==1,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values)[df_Format.LinkResetStatus==1]
+    # else:
+    #     df_Format.loc[df_Format.LinkResetStatus==1,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord)[df_Format.LinkResetStatus==1]
+    # df_Format['RESET_SIGNAL']= df_Format['IdleWord'].apply(binFormat,N=16)*(EPORTTX_NUMEN*2)
+
+    # df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
+    # df_Format.loc[np.where(df_Format.LinkResetStatus==1)[0],'FullDataString'] = df_Format.loc[np.where(df_Format.LinkResetStatus==1)[0],'RESET_SIGNAL'].values
 
     frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
@@ -471,7 +540,7 @@ def Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_
     df_Format['FRAMEQ_Truncated_0'] = 0
     df_Format['FRAMEQ_Truncated_1'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord','LinkResetStatus']]
 
 
 def formatRepeaterOutput(row,debug=False):
@@ -495,15 +564,45 @@ def formatRepeaterOutput(row,debug=False):
 
     return paddedData
 
-def Format_Repeater(df_Repeater, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord):
+def Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord, EPORTTX_NUMEN, df_LinkReset):
     df_in = pd.merge(df_Repeater, df_BX_CNT, left_index=True, right_index=True)
 
     df_Format = pd.DataFrame(df_in.apply(formatRepeaterOutput, axis=1).values,columns=['FullDataString'],index=df_in.index)
 
-    df_Format['FRAMEQ_NUMW'] = min(25, 2*EPORTTX_NUMEN)
+    linkResetStatus = np.zeros(len(df_Format),dtype=int)
+    linkResetSignalBX = np.where(df_LinkReset['LINKRESETECONT'].values==1)[0]+1
+    for reset_BX in linkResetSignalBX:
+        linkResetStatus[reset_BX:reset_BX+256] = 1
+
+    df_Format['LinkResetStatus'] = linkResetStatus
+
+    df_Format['FRAMEQ_NUMW'] = min(25, 2*EPORTTX_NUMEN)#(df_Format['FullDataString'] .str.len()/16).astype(int)
+    df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
 
     df_Format['IdleWord'] = 0 #(df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
 
+    #Insert link reset signal into data stream
+    linkResetBXlist = np.where(df_Format.LinkResetStatus==1)[0]
+    if type(TxSyncWord) is pd.DataFrame:
+        df_Format.loc[linkResetBXlist,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values)[linkResetBXlist]
+    else:
+        df_Format.loc[linkResetBXlist,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord)[linkResetBXlist]
+    df_Format['RESET_SIGNAL']= df_Format['IdleWord'].apply(binFormat,N=16)*(EPORTTX_NUMEN*2)
+
+    df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
+    df_Format.loc[linkResetBXlist,'FullDataString'] = df_Format.loc[linkResetBXlist,'RESET_SIGNAL'].values
+    # if type(TxSyncWord) is pd.DataFrame:
+    #     df_Format.loc[df_Format.LinkResetStatus==1,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values)[df_Format.LinkResetStatus==1]
+    #     # df_Format.loc[df_Format.LinkResetStatus==1,'IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values
+    # else:
+    #     df_Format.loc[df_Format.LinkResetStatus==1,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord)[df_Format.LinkResetStatus==1]
+    #     # df_Format.loc[df_Format.LinkResetStatus==1,'IdleWord'] = (df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+    # df_Format['RESET_SIGNAL']= df_Format['IdleWord'].apply(binFormat,N=16)*(EPORTTX_NUMEN*2)
+
+    # df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
+    # df_Format.loc[np.where(df_Format.LinkResetStatus==1)[0],'FullDataString'] = df_Format.loc[np.where(df_Format.LinkResetStatus==1)[0],'RESET_SIGNAL'].values
+
+    # if type(TxSyncWord) is pd.DataFrame:
     frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
     df_Format[frameQ_headers]= pd.DataFrame(df_Format.apply(splitToWords,axis=1).tolist(),columns=frameQ_headers,index=df_Format.index)
@@ -511,23 +610,24 @@ def Format_Repeater(df_Repeater, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord):
     df_Format['FRAMEQ_Truncated_0'] = 0
     df_Format['FRAMEQ_Truncated_1'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord','LinkResetStatus']]
 
 
 
-def binFormat(x,N):
-    return format(x,f'#0{N+2}b')[2:]
+def format_AutoencoderOutput(row, EPORTTX_NUMEN):
 
-binFormat=np.vectorize(binFormat)
+    #ae_Bits = np.array(list(bin(int(row['AE_OUTPUT_OUTENCODER'],16))[2:]))
+    if 'AE_BYTE0' in row.keys():
+        ae_Bits = np.array(list(''.join(row[[f'AE_BYTE{i}' for i in range(19,-1,-1)]].apply(binFormat,N=8))))[7:]
+    else:
+        ae_Bits = np.array(list(format(int(row['AE_OUTPUT_OUTENCODER'],16),'0153b')))
 
-def format_AutoencoderOutput(row, Eporttx_Numen):
-    ae_Bits = np.array(list(''.join(row[[f'AE_BYTE{i}' for i in range(19,-1,-1)]].apply(binFormat,N=8))))[7:]
     ae_Mask = np.array(list(''.join(row[[f'KAEB_BYTE{i}' for i in range(17,-1,-1)]].apply(binFormat,N=8))))=='1'
 
     modSum = ''.join(ae_Bits[-9:])
     ae_DataBits = ae_Bits[:-9]
 
-    nBits = 16 + 32*(Eporttx_Numen-1)
+    nBits = 18 + 32*(EPORTTX_NUMEN-1)
 
     AE_Data = ''.join(ae_DataBits[ae_Mask])[-1*nBits:]
 
@@ -537,18 +637,53 @@ def format_AutoencoderOutput(row, Eporttx_Numen):
     bx_cnt = row['BX_CNT']
     header =  format(bx_cnt, '#0%ib'%(7))[2:]
 
-    formattedData = header + modSum +'00' + AE_Data
+    formattedData = header + modSum + AE_Data
+
+    if not len(formattedData)%16 == 0:
+        formattedData += '0'*(16-len(formattedData)%16)
 
     return formattedData
 
-def Format_Autoencoder(df_Encoder, df_BX_CNT, Eporttx_Numen, TxSyncWord):
+def Format_Autoencoder(df_Encoder, df_BX_CNT, df_AEMask, EPORTTX_NUMEN, TxSyncWord, df_LinkReset):
     df_in = pd.merge(df_Encoder, df_BX_CNT, left_index=True, right_index=True)
 
-    df_Format = pd.DataFrame(df_in.apply(format_AutoencoderOutput, Eporttx_Numen=Eporttx_Numen, axis=1).values,columns=['FullDataString'],index=df_in.index)
+    df_in = pd.merge(df_in, df_AEMask, left_index=True, right_index=True)
+
+    df_Format = pd.DataFrame(df_in.apply(format_AutoencoderOutput, EPORTTX_NUMEN=EPORTTX_NUMEN, axis=1).values,columns=['FullDataString'],index=df_in.index)
+
+    linkResetStatus = np.zeros(len(df_Format),dtype=int)
+    linkResetSignalBX = np.where(df_LinkReset['LINKRESETECONT'].values==1)[0]+1
+
+    #Remove 1 BX of latency in starting time (due to 2 BX latency of this block, reset will start 1 'early')
+    linkResetSignalBX = linkResetSignalBX - 1
+    
+    for reset_BX in linkResetSignalBX:
+        linkResetStatus[reset_BX:reset_BX+256] = 1
+
+    df_Format['LinkResetStatus'] = linkResetStatus
 
     df_Format['FRAMEQ_NUMW'] = (df_Format['FullDataString'] .str.len()/16).astype(int)
 
     df_Format['IdleWord'] = 0 #(df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
+
+    #Insert link reset signal into data stream
+    linkResetBXlist = np.where(df_Format.LinkResetStatus==1)[0]
+    if type(TxSyncWord) is pd.DataFrame:
+        df_Format.loc[linkResetBXlist,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values)[linkResetBXlist]
+    else:
+        df_Format.loc[linkResetBXlist,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord)[linkResetBXlist]
+    df_Format['RESET_SIGNAL']= df_Format['IdleWord'].apply(binFormat,N=16)*(EPORTTX_NUMEN*2)
+
+    df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
+    df_Format.loc[linkResetBXlist,'FullDataString'] = df_Format.loc[linkResetBXlist,'RESET_SIGNAL'].values
+    # if type(TxSyncWord) is pd.DataFrame:
+    #     df_Format.loc[df_Format.LinkResetStatus==1,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord.values)[df_Format.LinkResetStatus==1]
+    # else:
+    #     df_Format.loc[df_Format.LinkResetStatus==1,'IdleWord'] = ((df_BX_CNT.BX_CNT.values<<11) + TxSyncWord)[df_Format.LinkResetStatus==1]
+    # df_Format['RESET_SIGNAL']= df_Format['IdleWord'].apply(binFormat,N=16)*(EPORTTX_NUMEN*2)
+
+    # df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
+    # df_Format.loc[np.where(df_Format.LinkResetStatus==1)[0]-1,'FullDataString'] = df_Format.loc[np.where(df_Format.LinkResetStatus==1)[0]-1,'RESET_SIGNAL'].values
 
     frameQ_headers = [f'FRAMEQ_{i}' for i in range(MAX_EPORTTX*2)]
 
@@ -557,4 +692,4 @@ def Format_Autoencoder(df_Encoder, df_BX_CNT, Eporttx_Numen, TxSyncWord):
     df_Format['FRAMEQ_Truncated_0'] = 0
     df_Format['FRAMEQ_Truncated_1'] = 0
 
-    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord']]
+    return df_Format[frameQ_headers+['FRAMEQ_NUMW','FRAMEQ_Truncated_0','FRAMEQ_Truncated_1','IdleWord','LinkResetStatus']]

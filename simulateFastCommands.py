@@ -77,7 +77,7 @@ def produceRandomFastCommandsAndOffsets(fastCommandPercent, N):
 
     return offsetChanges, fastCommands
 
-def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommands=-1, N=-1, ORBSYN_CNT_LOAD_VAL=0, makeOffsetChange=False, STARTUP_OFFSET_ORBITS=0, STARTUP_OFFSET_BUCKETS=0, randomSampling=False):
+def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommands=-1, N=-1, ORBSYN_CNT_LOAD_VAL=0, makeOffsetChange=False, STARTUP_OFFSET_ORBITS=0, STARTUP_OFFSET_BUCKETS=0, randomSampling=False, synchHeader=9, regularHeader=10):
 
     inputFile=f'{inputDir}/EPORTRX_data.csv'
     outputFile=f'{outputDir}/EPORTRX_data.csv'
@@ -87,6 +87,7 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
 
     try:
         eportRXData = pd.read_csv(inputFile,skipinitialspace=True)
+        eportRXData = eportRXData[[f'ePortRxDataGroup_{i}' for i in range(12)]] & 268435455
     except:
         print (f'Problem loading {inputFile}, trying EPortRX_Input_EPORTRX_data.csv')
         try:
@@ -240,11 +241,12 @@ def produceEportRX_input(inputDir, outputDir, configFile=None, randomFastCommand
 
 
     # set header, with BX counter after the fast commands
+    synchHeader = int(synchHeader,16)
+    regularHeader = int(regularHeader,16)
+    header = np.zeros(N,dtype=int) + regularHeader
+    header[globalBXCounter==0] = synchHeader
 
-    header = np.zeros(N,dtype=int) + 10
-    header[globalBXCounter==0] = 9
-
-    eportRXData.loc[header==9,'DATA_SYNCH'] = 'SYNCH'
+    eportRXData.loc[header==synchHeader,'DATA_SYNCH'] = 'SYNCH'
 
     for c in dataCols:
         eportRXData[c] = eportRXData[c] + (header<<28)
@@ -310,10 +312,17 @@ if __name__=='__main__':
     parser.add_argument('--random', default = False,dest="RandomSampling", action='store_true', help="Use random sampling of input data to increase statistics")
     parser.add_argument('--randomFast','--randomFastCommands', default = -1, type=float, dest='randomFastCommands', help='issue random fast commands a certain percent of the time (default is -1, which is off)')
     parser.add_argument('--NoAlgo', dest="StopAtAlgoBlock", default=False, action="store_true", help='Only run the code through the MuxFixCalib block, producing the CALQ files and nothing after')
-    parser.add_argument('-L', type=int, default = -1,dest="NLinks", help="Number of ePortTX links to use, -1 is all in input (default: -1)")
     parser.add_argument('--GodOrbitOffset', type=int, default = 1, dest="GodOrbitOffset", help="Offset in GodOrbit number caused by the startup (default 1)")
     parser.add_argument('--GodBucketOffset', type=int, default = 660, dest="GodBucketOffset", help="Offset in GodBucket number caused by the startup (default 660)")
-    parser.add_argument('--counterReset', type=int, default = 3513,dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 3513)")
+    parser.add_argument('--counterReset', type=int, default = 3513, dest="ORBSYN_CNT_LOAD_VAL", help="Value to reset BX counter to at reset (default: 3513)")
+    parser.add_argument('--hdmFlag', default = None, dest="hdmFlag", choices=[None,'0','1','True','False'], help="Specify whether HDM or not (default None, means read from metaData.py")
+    parser.add_argument('--synchHeader', default = '9', dest="synchHeader", help="Value of header to be used at BC0 (default=9)")
+    parser.add_argument('--regularHeader', default = 'A', dest="regularHeader", help="Value of header to be everywhere other than BC0 (default=A)")
+    parser.add_argument('--calibration', default = None, dest="calibration", help="Value of calibrations to use")
+    parser.add_argument('--threshold', default = None, dest="threshold", help="Value of thresholds to use")
+    parser.add_argument('--eTx', default = -1, dest="eTx", type=int, help="Number of eTx to use")
+    parser.add_argument('--dropBits', default = -1, dest="dropBits", type=int, help="Number of bits to drop")
+    parser.add_argument('--useSum', default = False, dest="useSum", type=bool, help="Use full sum or sum not transmitted (True corresponds to full sum)")
 
     args = parser.parse_args()
 
@@ -333,14 +342,36 @@ if __name__=='__main__':
                                                           randomFastCommands = args.randomFastCommands,
                                                           N = args.N,
                                                           ORBSYN_CNT_LOAD_VAL=args.ORBSYN_CNT_LOAD_VAL,
-                                                          makeOffsetChange=True,
+                                                          makeOffsetChange=False,
                                                           STARTUP_OFFSET_ORBITS = args.GodOrbitOffset,
                                                           STARTUP_OFFSET_BUCKETS = args.GodBucketOffset,
-                                                          randomSampling=args.RandomSampling)
+                                                          randomSampling=args.RandomSampling,
+                                                          synchHeader=args.synchHeader,
+                                                          regularHeader=args.regularHeader)
+    
+    CalRegisters=args.calibration
+    try:
+        calReg = float(CalRegisters)
+    except:
+        calReg = CalRegisters
 
-    runEmulator(tempOutputDir, ePortTx=args.NLinks, StopAtAlgoBlock=args.StopAtAlgoBlock)
+    ThreshRegister=args.threshold
+    try:
+        thrReg = float(ThreshRegister)
+    except:
+        thrReg = ThreshRegister
+
+    runEmulator(tempOutputDir, 
+                ePortTx=args.eTx, 
+                StopAtAlgoBlock=args.StopAtAlgoBlock, 
+                MuxRegisters='passThrough', 
+                CalRegisters=calReg, 
+                ThresholdRegisters=thrReg, 
+                Use_Sum=args.useSum, 
+                HDMFlag=args.hdmFlag,
+                nDropBits=args.dropBits)
 
     makeVerificationData(tempOutputDir, args.outputDir, stopAtAlgoBlock=args.StopAtAlgoBlock)
 
-    shutil.rmtree(tempOutputDir)
+#    shutil.rmtree(tempOutputDir)
     

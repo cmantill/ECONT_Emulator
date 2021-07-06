@@ -576,7 +576,7 @@ def Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord, EPORTTX_NUMEN, df_LinkRe
 
     df_Format['LinkResetStatus'] = linkResetStatus
 
-    df_Format['FRAMEQ_NUMW'] = min(25, 2*EPORTTX_NUMEN)#(df_Format['FullDataString'] .str.len()/16).astype(int)
+    df_Format['FRAMEQ_NUMW'] = EPORTTX_NUMEN*2#(df_Format['FullDataString'] .str.len()/16).astype(int)
     df_Format.loc[df_Format.LinkResetStatus==1,'FRAMEQ_NUMW'] = EPORTTX_NUMEN*2
 
     df_Format['IdleWord'] = 0 #(df_BX_CNT.BX_CNT.values<<11) + TxSyncWord
@@ -627,7 +627,7 @@ def format_AutoencoderOutput(row, EPORTTX_NUMEN):
     modSum = ''.join(ae_Bits[-9:])
     ae_DataBits = ae_Bits[:-9]
 
-    nBits = 18 + 32*(EPORTTX_NUMEN-1)
+    nBits = min(18 + 32*(EPORTTX_NUMEN-1),146)
 
     AE_Data = ''.join(ae_DataBits[ae_Mask])[-1*nBits:]
 
@@ -635,8 +635,8 @@ def format_AutoencoderOutput(row, EPORTTX_NUMEN):
         AE_Data = '0'*(nBits-len(AE_Data)) + AE_Data
 
     bx_cnt = row['BX_CNT']
-    header =  format(bx_cnt, '#0%ib'%(7))[2:]
-
+    header =  format(bx_cnt, '0%ib'%(5))
+    
     formattedData = header + modSum + AE_Data
 
     if not len(formattedData)%16 == 0:

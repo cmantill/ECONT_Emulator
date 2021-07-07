@@ -20,7 +20,7 @@ from ASICBlocks.Formatter import Format_Threshold_Sum, Format_BestChoice, Format
 from ASICBlocks.BufferBlock import Buffer
 
 
-def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False, MuxRegisters=None, CalRegisters=None, HDMFlag=None, ThresholdRegisters=None, Buff_T1=None, Buff_T2=None, Buff_T3=None):
+def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word='01100110011', nDropBits=-1, Use_Sum=False, StopAtAlgoBlock=False, AEMuxOrdering=False, SimEnergyFlag=False, MuxRegisters=None, CalRegisters=None, HDMFlag=None, ThresholdRegisters=None, Buff_T1=None, Buff_T2=None, Buff_T3=None, writeFullBufferOutput=False):
     if inputDir[-1]=="/": inputDir = inputDir[:-1]
     subdet,layer,wafer,isHDM,geomVersion = loadMetaData(inputDir)
     df_ePortRxDataGroup, df_BX_CNT, df_SimEnergyStatus, df_linkReset = loadEportRXData(inputDir,SimEnergyFlag)
@@ -146,7 +146,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
 
     print('Formatter/Buffer Threshold-Sum')
     df_Format_TS = Format_Threshold_Sum(df_Threshold_Sum, df_BX_CNT, TxSyncWord, Use_Sum, EPORTTX_NUMEN, df_linkReset)
-    df_BufferOutput_TS  = Buffer(df_Format_TS,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
+    df_BufferOutput_TS  = Buffer(df_Format_TS,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3, writeFullBufferOutput)
     del df_Threshold_Sum
     df_Format_TS.to_csv(f'{outputDir}/Format_TS.csv',index=saveIndex)
     df_BufferOutput_TS.to_csv(f'{outputDir}/Buffer_TS.csv',index=saveIndex)
@@ -155,7 +155,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
 
     print('Formatter/Buffer Best Choice')
     df_Format_BC = Format_BestChoice(df_BestChoice, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, Use_Sum, df_linkReset)
-    df_BufferOutput_BC  = Buffer(df_Format_BC,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
+    df_BufferOutput_BC  = Buffer(df_Format_BC,  EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3, writeFullBufferOutput)
     del df_BestChoice
     df_Format_BC.to_csv(f'{outputDir}/Format_BC.csv',index=saveIndex)
     df_BufferOutput_BC.to_csv(f'{outputDir}/Buffer_BC.csv',index=saveIndex)
@@ -164,7 +164,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
 
     print('Formatter/Buffer STC')
     df_Format_STC = Format_SuperTriggerCell(df_SuperTriggerCell, STC_TYPE, EPORTTX_NUMEN, df_BX_CNT, TxSyncWord, df_linkReset)
-    df_BufferOutput_STC = Buffer(df_Format_STC, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
+    df_BufferOutput_STC = Buffer(df_Format_STC, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3, writeFullBufferOutput)
     del df_SuperTriggerCell
     df_Format_STC.to_csv(f'{outputDir}/Format_STC.csv',index=saveIndex)
     df_BufferOutput_STC.to_csv(f'{outputDir}/Buffer_STC.csv',index=saveIndex)
@@ -173,7 +173,7 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
 
     print('Formatter/Buffer Repeater')
     df_Format_RPT = Format_Repeater(df_Repeater, df_BX_CNT, TxSyncWord, EPORTTX_NUMEN, df_linkReset)
-    df_BufferOutput_RPT = Buffer(df_Format_RPT, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3)
+    df_BufferOutput_RPT = Buffer(df_Format_RPT, EPORTTX_NUMEN, BUFFER_THRESHOLD_T1, BUFFER_THRESHOLD_T2, BUFFER_THRESHOLD_T3, writeFullBufferOutput)
     del df_Repeater
     df_Format_RPT.to_csv(f'{outputDir}/Format_RPT.csv',index=saveIndex)
     df_BufferOutput_RPT.to_csv(f'{outputDir}/Buffer_RPT.csv',index=saveIndex)
@@ -200,6 +200,7 @@ if __name__=='__main__':
     parser.add_argument('--T1', type=int, default = None, dest="Buff_T1", help="Buffer threshold T1")
     parser.add_argument('--T2', type=int, default = None, dest="Buff_T2",help="Buffer threshold T2")
     parser.add_argument('--T3', type=int, default = None, dest="Buff_T3",help="Buffer threshold T3")
+    parser.add_argument('-f', '--write-full-buffer-output', action='store_true', dest='writeFullBufferOutput', help='Write complete contents of buffer (default is to write only as many rows of output as there are rows of input')
 
     args = parser.parse_args()
     

@@ -229,7 +229,7 @@ def formatBestChoiceOutput(row, nTC = 1, debug=False):
 
     bx_cnt = row['BX_CNT']
     header =  format(bx_cnt, '#0%ib'%(7))[2:]
-    header = header[1:]
+    header = header[0] + header[2:]
 
     if Use_Sum:
         modSumData = format(SUM, '#010b')[2:]

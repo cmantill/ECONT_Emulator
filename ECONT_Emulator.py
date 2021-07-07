@@ -109,20 +109,9 @@ def runEmulator(inputDir, outputDir=None, ePortTx=-1, STC_Type=-1, Tx_Sync_Word=
     pd.DataFrame([[STC_TYPE]], columns=['STC_TYPE'],index=df_CALQ.index).to_csv(f'{outputDir}/STC_TYPE.csv', index=saveIndex)
     pd.DataFrame([[Use_Sum]], columns=['USE_SUM'],index=df_CALQ.index).to_csv(f'{outputDir}/Use_Sum.csv', index=saveIndex)
 
-    if Buff_T1 is not None:
-        BUFFER_THRESHOLD_T1 = Buff_T1
-    else:
-        BUFFER_THRESHOLD_T1 = EPORTTX_NUMEN*12*2
-    if Buff_T2 is not None:
-        BUFFER_THRESHOLD_T2 = Buff_T2
-    else:
-        BUFFER_THRESHOLD_T2 = EPORTTX_NUMEN*12*2-25
-    if Buff_T3 is not None:
-        BUFFER_THRESHOLD_T3 = Buff_T3
-    else:
-        BUFFER_THRESHOLD_T3 = 25
-
-
+    BUFFER_THRESHOLD_T1 = Buff_T1 if Buff_T1 is not None else EPORTTX_NUMEN*12*2
+    BUFFER_THRESHOLD_T2 = Buff_T2 if Buff_T2 is not None else EPORTTX_NUMEN*12*2-25
+    BUFFER_THRESHOLD_T3 = Buff_T3 if Buff_T3 is not None else 25
 
     pd.DataFrame([[int(BUFFER_THRESHOLD_T1)]], columns=['BUFFER_THRESHOLD_T1'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T1.csv', index=saveIndex)
     pd.DataFrame([[int(BUFFER_THRESHOLD_T2)]], columns=['BUFFER_THRESHOLD_T2'],index=df_CALQ.index).to_csv(f'{outputDir}/Buffer_Threshold_T2.csv', index=saveIndex)

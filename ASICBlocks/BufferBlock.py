@@ -3,7 +3,7 @@ import numpy as np
 
 MAX_EPORTTX=13
 
-def Buffer(df_formatterOutput, EPORTTX_NUMEN, T1 , T2, T3):
+def Buffer(df_formatterOutput, EPORTTX_NUMEN, T1, T2, T3, writeFullBufferOutput=False):
 
     BufferContents = np.array([-1]*400,dtype=np.int64)
     writePointer = 0
@@ -60,8 +60,21 @@ def Buffer(df_formatterOutput, EPORTTX_NUMEN, T1 , T2, T3):
         
         totalData.append(outputData)
 
+    if writeFullBufferOutput:
+        while writePointer > 0:
+            words = BufferContents[:2*EPORTTX_NUMEN]
+            
+            outputData = ((words[::2]<<16) + words[1::2]).tolist()
+            BufferContents[0:400-2*EPORTTX_NUMEN] = BufferContents[2*EPORTTX_NUMEN:400]
+            writePointer = max(writePointer-2*EPORTTX_NUMEN, 0)
+
+            outputData += [0]*(MAX_EPORTTX-EPORTTX_NUMEN)
+            outputData += [truncated, Nbuf, NBXc, cond1, cond2, cond3, cond4]
+            
+            totalData.append(outputData)
+
     txDataColumns = [f'TX_DATA_{i}' for i in range(MAX_EPORTTX)]
     statusColumns = ['Truncated', 'Nbuf', 'NBXc', 'Cond1', 'Cond2','Cond3','Cond4']
-    df_BufferOutput = pd.DataFrame(data = np.array(totalData), columns=txDataColumns + statusColumns, index=df_formatterOutput.index)
+    df_BufferOutput = pd.DataFrame(data = np.array(totalData), columns=txDataColumns + statusColumns, index=df_formatterOutput.index if not writeFullBufferOutput else None)
 
     return df_BufferOutput

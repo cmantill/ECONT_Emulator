@@ -1,13 +1,18 @@
 import pandas as pd
 import numpy as np
+import configparser
 
 def loadMetaData(_inputDir):
-    metaDataFile = f"{_inputDir.replace('/','.')}.metaData"
-    subdet=getattr(__import__(metaDataFile,fromlist=["subdet"]),"subdet")
-    layer=getattr(__import__(metaDataFile,fromlist=["layer"]),"layer")
-    wafer=getattr(__import__(metaDataFile,fromlist=["wafer"]),"wafer")
-    isHDM=getattr(__import__(metaDataFile,fromlist=["isHDM"]),"isHDM")
-    geomVersion=getattr(__import__(metaDataFile,fromlist=["geomVersion"]),"geomVersion")
+    config = configparser.ConfigParser()
+    with open(f'{_inputDir}/metaData.py') as cfgfile:
+        config.read_string('[section]\n' + cfgfile.read())
+    sec = config['section']
+
+    subdet = sec.getint('subdet')
+    layer = sec.getint('layer')
+    wafer = sec.getint('wafer')
+    geomVersion = sec.get('geomversion')[1:-1]
+    isHDM = sec.getboolean('isHDM')
     
     return subdet, layer, wafer, isHDM, geomVersion
 

@@ -47,11 +47,9 @@ def FloatToFix(df_Mux_out, isHDM):
 def getCalibrationRegisters_Thresholds(subdet, layer, wafer, geomVersion, tpgNtupleMapping=False, CalRegisters=None, ThresholdRegisters=None):
     
     if geomVersion in ['v10','v11']:
-        with open('Utils/geomDF_v10.pkl','rb') as geomFile:
-            geomDF = pickle.load(geomFile).loc[subdet,layer,wafer]
+        geomDF = pd.read_csv('Utils/geomDF_v10.csv', index_col=[0,1,2,3]).loc[subdet,layer,wafer]
     else:
-        with open('Utils/geomDF_v9.pkl','rb') as geomFile:
-            geomDF = pickle.load(geomFile).loc[subdet,layer,wafer]
+        geomDF = pd.read_csv('Utils/geomDF_v9.csv', index_col=[0,1,2,3]).loc[subdet,layer,wafer]
 
     if len(geomDF)<48:
         newGeomDF = pd.DataFrame({'corrFactor_finite':[0]*48,'threshold_ADC':[0]*48,'triggercell':np.arange(48)})

@@ -5,7 +5,7 @@ from Utils.encode import encode, decode
 encodeV = np.vectorize(encode)
 decodeV = np.vectorize(decode)
 
-def makeCHARGEQ(row, nDropBit=1):
+def makeCHARGEQ(row, thresholds):
     nExp = 4
     nMant = 3
     roundBits = False
@@ -16,7 +16,7 @@ def makeCHARGEQ(row, nDropBit=1):
 
     nDropBit = row['DropLSB']
 
-    raw_charges     = np.array(CALQ[CALQ>=0]).astype(int)
+    raw_charges     = np.array(CALQ[CALQ>=thresholds]).astype(int)
     if len(raw_charges)>0:
         encoded_charges = encodeV(raw_charges,nDropBit,nExp,nMant,roundBits,asInt=True)
     else:
@@ -36,11 +36,7 @@ def ThresholdSum(df_CALQ, THRESHV_Registers, DropLSB):
     df_Threshold_Sum = (df_CALQ>=thresholds).astype(int)
     df_Threshold_Sum.columns = ADD_MAP_Headers
 
-    # temporary solution, put charges of < threshold to negative value, to be sorted out in makeCHARGEQ
-    df_in = ((df_CALQ>=thresholds).astype(int)*2 - 1 )*df_CALQ
-    df_in['DropLSB'] = DropLSB
-
-    qlist = df_in.apply(makeCHARGEQ,axis=1)
+    qlist = df_CALQ.join(DropLSB).apply(makeCHARGEQ,axis=1, args=(thresholds,))
     df_Threshold_Sum[CHARGEQ_Headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_Headers)
     df_Threshold_Sum['SUM'] = encodeV((df_CALQ).sum(axis=1),0,5,3,False,True)
     df_Threshold_Sum['SUM_NOT_TRANSMITTED'] = encodeV(((df_CALQ<thresholds)*df_CALQ).sum(axis=1),0,5,3,False,True)

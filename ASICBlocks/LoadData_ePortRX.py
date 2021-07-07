@@ -48,7 +48,7 @@ def loadEportRXData(_inputDir, simEnergy=False, alignmentTime=324):
     ePortHeader = df['ePortRxDataGroup_0'].values>>28
     if (ePortHeader==0).all() :
         headers = df['BX'].values%16
-        #headers[df['BX'].values==0] = 31
+        headers[df['BX'].values==0] = 31
     else:
         try:
             CounterResetValue = pd.read_csv(f"{_inputDir}/CounterResetValue.csv").loc[0].CounterResetValue
@@ -76,7 +76,6 @@ def loadEportRXData(_inputDir, simEnergy=False, alignmentTime=324):
     df.set_index(['Orbit','BX'], inplace=True)
 
     df_BX_CNT = pd.DataFrame(headers, columns=['BX_CNT'], index=df.index)
-    df_BX_CNT.iloc[0] = 31
 
     if simEnergy:
         if 'EventSimEnergy' in df.columns:

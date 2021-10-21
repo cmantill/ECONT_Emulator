@@ -25,6 +25,10 @@ def loadEportRXData(_inputDir, simEnergy=False, alignmentTime=324):
             break
         except:
             continue
+    if 'csv' in _inputDir:
+        df = pd.read_csv(_inputDir, skipinitialspace=True)
+        df.columns = [f'ePortRxDataGroup_{i}' for i in range(12)]
+        df[df.columns] = np.vectorize(int)(df,16)
     if df is None:
         raise AttributeError("Input data not found")
 

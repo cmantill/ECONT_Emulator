@@ -27,6 +27,7 @@ def loadDefaults(regYaml):
                 prefix = prefix.replace('config_','')
 
                 for r in params:
+                    # print(regName,params[r])
                     mask = params[r]['param_mask']
                     shift = params[r]['param_shift']
                     paramName = f'{prefix}{r}'
@@ -180,7 +181,7 @@ def runEmulator(inputDir, defaultRegMapDir, verbose=False):
     i2cDict = {**loadDefaults(defaultI2C['ECON-T']['RW']),
                **loadUpdates(runSpecificSetup['ECON-T']['RW'])}
 
-    eRx_Data=f'{inputDir}/testInput.csv'
+    eRx_Data=f'{inputDir}/../testInput.csv'
     alignmentTime=256
 
     latency=0
@@ -249,8 +250,8 @@ if __name__=='__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--inputDir', default = '../econt_test-vectors/counterPatternInTC', dest="inputDir", help="Input directory containing testInput.csv and init.yaml files")
-    parser.add_argument('--defaultCfg', default = 'yamlfiles', dest="defaultRegMapDir", help="Directory containing default register map")
+    parser.add_argument('--inputDir', default = ' ../econt_sw/configs/test_vectors/counterPatternInTC/RPT/', dest="inputDir", help="Input directory containing testInput.csv and init.yaml files")
+    parser.add_argument('--defaultCfg', default = '../econt_sw/zmq_i2c/reg_maps/', dest="defaultRegMapDir", help="Directory containing default register map")
     parser.add_argument('-v', default = False, action='store_true', dest="verbose", help="Verbose output")
 
     args = parser.parse_args()

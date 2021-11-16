@@ -85,18 +85,22 @@ def AlgorithmRoutine(algo, df_CALQ, i2cDict, verbose=True):
 
     df_Threshold = np.array([i2cDict[f'ALGO_THRESHOLD_VAL_threshold_val_{i}'] for i in range(48)])
     if algo==0: #threshold sum
+        print('algo TS')
         latency=1
         df_Emulator=ThresholdSum(df_CALQ, df_Threshold, df_DropLSB)
 
     elif algo==1: #STC
+        print('algo STC')
         latency = 1
         df_Emulator = SuperTriggerCell(df_CALQ, df_DropLSB)
 
     elif algo==2: #BC
+        print('algo BC')
         latency = 2
         df_Emulator = BestChoice(df_CALQ, df_DropLSB)
 
     elif algo==3: #RPT
+        print('algo RPT')
         latency = 1
         df_Emulator = Repeater(df_CALQ, df_DropLSB)
 

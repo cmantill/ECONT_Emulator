@@ -32,11 +32,13 @@ def ThresholdSum(df_CALQ, THRESHV_Registers, DropLSB):
         thresholds = THRESHV_Registers.values
     else:
         thresholds = THRESHV_Registers
-
+    #print('charge ',df_CALQ>)
+    print('th ',thresholds)
     df_Threshold_Sum = (df_CALQ>=thresholds).astype(int)
     df_Threshold_Sum.columns = ADD_MAP_Headers
 
     qlist = df_CALQ.join(DropLSB).apply(makeCHARGEQ,axis=1, args=(thresholds,))
+    print(qlist)
     df_Threshold_Sum[CHARGEQ_Headers] = pd.DataFrame(qlist.values.tolist(),index=qlist.index,columns=CHARGEQ_Headers)
     df_Threshold_Sum['SUM'] = encodeV((df_CALQ).sum(axis=1),0,5,3,False,True)
     df_Threshold_Sum['SUM_NOT_TRANSMITTED'] = encodeV(((df_CALQ<thresholds)*df_CALQ).sum(axis=1),0,5,3,False,True)

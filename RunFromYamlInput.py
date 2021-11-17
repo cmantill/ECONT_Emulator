@@ -148,6 +148,7 @@ def FormatterRoutine(algo,
 
     elif algo==1: #STC
         latency=1
+        print('type ',STC_Type)
         df_Emulator = Format_SuperTriggerCell(df_STC, STC_Type, EPortTx_NumEn, df_BX_CNT, TxSyncWord, df_LinkReset).drop('IdleWord',axis=1)
 
     elif algo==2: #BC

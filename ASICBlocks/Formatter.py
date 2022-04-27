@@ -220,12 +220,12 @@ def formatBestChoiceOutput(row, nTC = 1, debug=False):
     sel_add = ADD_MAP[:nTC]
 
     BITMAP = np.zeros(48, dtype=np.int32)
-    CHARGEQ = np.zeros(48, dtype=np.int32)
+    CHARGEQ = np.zeros(48, dtype=np.int32)-1
 
     BITMAP[sel_add] = 1
     CHARGEQ[sel_add] = sel_q 
 
-    CHARGEQ=CHARGEQ[CHARGEQ>0]      ## remove zeros
+    CHARGEQ=CHARGEQ[CHARGEQ>-1]      ## remove zeros
 
     bx_cnt = row['BX_CNT']
     header =  format(bx_cnt, '#0%ib'%(7))[2:]

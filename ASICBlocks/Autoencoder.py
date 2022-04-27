@@ -61,7 +61,7 @@ def Autoencoder(df_CalQ, weights=None):
         exit()
 
     df.to_csv(f'{cwd}/cpp_executables_AutoEncoder/converter/inputs/tb_converter_inputs.dat',sep=' ',header=False, index=False)
-    convertOut = Popen('converter.x',cwd=f"{cwd}/cpp_executables_AutoEncoder/converter",stdout=PIPE).communicate()
+    convertOut = Popen('./converter.x',cwd=f"{cwd}/cpp_executables_AutoEncoder/converter",stdout=PIPE).communicate()
 
     sumDF = pd.read_csv(f'{cwd}/cpp_executables_AutoEncoder/converter/outputs/implementation/tb_converter_sum_outputs.dat',header=None,names=['encodedSUM'])
 
@@ -81,7 +81,7 @@ def Autoencoder(df_CalQ, weights=None):
         np.array(weights[2]).tofile(f'{cwd}/cpp_executables_AutoEncoder/encoder/inputs/weights/w4.txt',sep=', ')
         np.array(weights[3]).tofile(f'{cwd}/cpp_executables_AutoEncoder/encoder/inputs/weights/b4.txt',sep=', ')
 
-    encodeOut = Popen('encoder.x',cwd=f"{cwd}/cpp_executables_AutoEncoder/encoder",stdout=PIPE).communicate()
+    encodeOut = Popen('./encoder.x',cwd=f"{cwd}/cpp_executables_AutoEncoder/encoder",stdout=PIPE).communicate()
 
     columns = [f'OUT_{i}' for i in range(16)]
 

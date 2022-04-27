@@ -44,9 +44,9 @@ def loadDefaults(regYaml):
 
                 if '*' in paramName:
                     for i,v in enumerate(val):
-                        registerValues[paramName.replace('*',f'{i}')]=(v>>shift)&mask
+                        registerValues[paramName.replace('*',f'{i}')]=v
                 else:
-                    registerValues[paramName]=(val>>shift)&mask
+                    registerValues[paramName]=val
 
     return registerValues
 
@@ -72,6 +72,28 @@ def loadUpdates(regYaml):
                     registerValues[rName] = out[r]['param_value']
 
     return registerValues
+
+def toDecimal(x):
+    w = -1. if x[0]=='1' else 0
+    w += int(x[1:],2)/2**5
+    return w
+
+def i2cDictToWeights(i2cDict):
+    bits=''
+    for i in range(12)[::-1]:
+        reg_name=f'AUTOENCODER_{i}INPUT_weights_byte128'
+        r=f'{i2cDict[reg_name]:048b}'
+        bits += r
+        for j in range(0,127,16)[::-1]:
+            reg_name=f'AUTOENCODER_{i}INPUT_weights_byte{j}'
+            r=f'{i2cDict[reg_name]:0128b}'
+            bits += r
+    wbWB=[toDecimal(bits[i:i+6]) for i in range(0,len(bits),6)][::-1]
+    _w=wbWB[:72]
+    _b=wbWB[72:80]
+    _W=wbWB[80:2128]
+    _B=wbWB[2128:]
+    return _w,_b,_W,_B
 
 
 
@@ -108,7 +130,7 @@ def AlgorithmRoutine(algo, df_CALQ, i2cDict, verbose=True):
     elif algo==4: #AE
         latency=2
 
-        weights = convertI2CtoWeights(inputDir)
+        weights = i2cDictToWeights(i2cDict)
         df_Emulator = Autoencoder(df_CALQ.reset_index(drop=True),weights)
 
     else:
@@ -166,9 +188,12 @@ def FormatterRoutine(algo,
     elif algo==4: #AE
         latency=2
 
-        #NEEDS TO BE FIXED
-        df_AEMask = pd.DataFrame({'USE_SUM':i2cDict['FMTBUF_ALL_use_sum']},index=df_BX_CNT.index)
+        maskBytes=[(i2cDict['FMTBUF_ALL_mask_ae2']>>(8*i)) & 0xff for i in range(2)] + [(i2cDict['FMTBUF_ALL_mask_ae']>>(8*i)) & 0xff for i in range(16)]
+        maskBytes_dict={}
+        for i in range(18):
+            maskBytes_dict[f'KAEB_BYTE{i}']=maskBytes[i]
 
+        df_AEMask = pd.DataFrame(maskBytes_dict,index=df_BX_CNT.index)
         df_Emulator = Format_Autoencoder(df_Autoencoder, df_BX_CNT, df_AEMask, EPortTx_NumEn, TxSyncWord, df_LinkReset).drop('IdleWord',axis=1)
 
     if verbose: print('   --- Finished Formatter')

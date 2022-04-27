@@ -1,12 +1,15 @@
 mkdir converter/inputs
+mkdir converter/outputs
 mkdir converter/outputs/reference
 mkdir converter/outputs/implementation
 
-encoder/inputs/weights
-encoder/inputs/features
+mkdir encoder/inputs
+mkdir encoder/inputs/weights
+mkdir encoder/inputs/features
 
-encoder/outputs/implementation  
-encoder/outputs/reference
+mkdir encoder/outputs  
+mkdir encoder/outputs/implementation  
+mkdir encoder/outputs/reference
 
 touch converter/outputs/implementation/tb_converter_outputs.dat
 cd encoder/inputs/features
